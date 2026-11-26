@@ -48,7 +48,17 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--
 .combo{position:absolute;right:14px;top:calc(max(10px,env(safe-area-inset-top)) + 48px);font:800 20px "Baloo 2",sans-serif;color:#ffcf3a;text-shadow:0 2px 0 #000;opacity:0;transition:opacity .2s}
 .combo.on{opacity:1}
 #reward{position:fixed;inset:0;background:#14061fd9;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:20px;text-align:center;z-index:5}
-#reward[hidden]{display:none}
+#reward[hidden],#settings[hidden]{display:none}
+#settings{position:fixed;inset:0;background:#14061f;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:20px;text-align:center;z-index:6;overflow:auto}
+#settings h2{font:400 clamp(30px,9vw,44px)/1 "Rubik Wet Paint",cursive;color:var(--goo);margin:0}
+.set{width:100%;max-width:340px;display:grid;gap:12px;text-align:left;background:#ffffff0d;border:2px solid #ffffff1a;border-radius:18px;padding:14px}
+.set label{display:grid;gap:4px;font-weight:700}.set label small{color:#cbb8ee;font-weight:500}
+.set input[type=range]{width:100%;accent-color:#9cff3c;height:28px}
+.set .chk{display:flex;align-items:center;gap:10px}.set .chk input{width:24px;height:24px;accent-color:#9cff3c}
+.seg{display:grid;grid-template-columns:auto repeat(3,minmax(0,1fr));gap:6px;align-items:center;font-weight:700}
+.seg button{font:800 15px "Baloo 2",sans-serif;border:2px solid #ffffff33;background:#0006;color:var(--ink);border-radius:14px;min-height:44px}
+.seg button.on{background:var(--goo);color:#14061f;border-color:var(--goo)}
+.seg button:disabled{opacity:.5}
 #reward h2{font:400 clamp(30px,9vw,44px)/1 "Rubik Wet Paint",cursive;color:var(--goo);margin:0}
 #reward p{margin:0;color:#cbb8ee}
 .rcards{display:grid;gap:10px;width:100%;max-width:360px}
@@ -92,7 +102,7 @@ h1{font:400 clamp(44px,13vw,72px)/1 "Rubik Wet Paint",cursive;color:var(--goo);m
     <div class="hp"><i id="hpbar"></i></div>
     <div class="tag" id="wavetag">Đợt 1/5</div>
     <div class="tag" id="score">0</div>
-    <button id="music" class="pill">Nhạc: bật</button><button id="recenter" class="pill">Căn giữa</button>
+    <button id="pauseBtn" class="pill" aria-label="Tạm dừng và cài đặt">II</button><button id="recenter" class="pill">Căn giữa</button>
   </div>
   <div class="bottom">
     <button class="btn" id="reload">NẠP</button>
@@ -107,6 +117,20 @@ h1{font:400 clamp(44px,13vw,72px)/1 "Rubik Wet Paint",cursive;color:var(--goo);m
   <div class="bossbar" id="bossbar" hidden><b id="bossName">Đại Pudding</b><div><i id="bossHp"></i></div></div>
 </div>
 <div id="hint"></div>
+<div id="settings" hidden>
+  <h2 id="setTitle">Tạm dừng</h2>
+  <p class="note" id="setNote"></p>
+  <div class="set">
+    <label>Nhạc nền <input type="range" id="sMv" min="0" max="100" step="5"></label>
+    <label>Hiệu ứng âm thanh <input type="range" id="sSv" min="0" max="100" step="5"></label>
+    <label>Độ nhạy ngắm <input type="range" id="sSens" min="50" max="200" step="10"><small id="sSensV"></small></label>
+    <label class="chk"><input type="checkbox" id="sVib"> Rung khi bắn và bị cắn</label>
+    <div class="seg" role="group" aria-label="Độ khó"><span>Độ khó</span><button data-d="easy">Dễ</button><button data-d="normal">Thường</button><button data-d="hard">Khó</button></div>
+    <p class="note" id="diffNote"></p>
+  </div>
+  <button class="go" id="resumeBtn">Tiếp tục</button>
+  <button class="go2" id="quitBtn">Về màn hình chính</button>
+</div>
 <div id="reward" hidden>
   <h2>Chọn phần thưởng</h2>
   <p id="rwTime">Tự chọn sau 9 giây</p>
@@ -123,6 +147,7 @@ h1{font:400 clamp(44px,13vw,72px)/1 "Rubik Wet Paint",cursive;color:var(--goo);m
     <div class="card"><canvas data-t="box"></canvas><b>Hộp Quà Cắn</b><span>Trâu, đợt 4 và 5</span></div>
   </div>
   <button class="go" id="startBtn">Chơi một mình</button>
+  <button class="go2" id="setBtn">Cài đặt</button>
   <div class="mp">
     <b>Chơi cùng bạn (2–3 người)</b>
     <div class="row"><button class="go2" id="hostBtn">Tạo phòng</button></div>
@@ -174,7 +199,7 @@ function onOri(e){
   S.rawYaw=Math.atan2(x,y);
   if(S.yaw0==null)S.yaw0=S.rawYaw;
   S.gyro=true;
-  S.tYaw=wrap(S.rawYaw-S.yaw0);S.tPitch=Math.asin(clamp(z,-1,1));
+  S.tYaw=wrap(S.rawYaw-S.yaw0)*SET.sens/100;S.tPitch=Math.asin(clamp(z,-1,1))*Math.min(1.5,SET.sens/100);
 }
 addEventListener('deviceorientation',onOri);
 
@@ -188,19 +213,30 @@ cv.addEventListener('pointerdown',e=>{
 addEventListener('pointermove',e=>{
   if(!pd||S.gyro)return;
   const dx=e.clientX-pd.x,dy=e.clientY-pd.y;pd.m+=Math.abs(dx)+Math.abs(dy);pd.x=e.clientX;pd.y=e.clientY;
-  S.tYaw=clamp(S.tYaw-dx*0.004,-75*D2R,75*D2R);S.tPitch=clamp(S.tPitch+dy*0.004,-0.6,0.5);
+  const k=.004*SET.sens/100;S.tYaw=clamp(S.tYaw-dx*k,-75*D2R,75*D2R);S.tPitch=clamp(S.tPitch+dy*k,-0.6,0.5);
 });
 addEventListener('pointerup',()=>{if(G&&S.gyro&&!$('fire').matches(':active'))G.firing=false;if(pd&&pd.m<12&&performance.now()-pd.t<350)shoot();pd=null});
+
+/* ---------- cài đặt ---------- */
+const SET={mv:80,sv:100,sens:100,vib:true,diff:'normal'};
+try{Object.assign(SET,JSON.parse(localStorage.getItem('thachma-set')||'{}'))}catch(e){}
+const DIFF={easy:{spd:.8,dmg:.6,cnt:.8,ammo:1.3,name:'Dễ: quái chậm, cắn nhẹ, nhiều đạn'},normal:{spd:1,dmg:1,cnt:1,ammo:1,name:'Thường: như thiết kế ban đầu'},hard:{spd:1.2,dmg:1.4,cnt:1.25,ammo:.85,name:'Khó: quái nhanh, cắn đau, ít đạn'}};
+const DF=()=>DIFF[(G&&G.diff)||SET.diff]||DIFF.normal;
+function saveSet(){try{localStorage.setItem('thachma-set',JSON.stringify(SET))}catch(e){}applySet()}
+function applySet(){if(MUS.g)MUS.g.gain.setTargetAtTime(MUS.on?SET.mv/100:0,AC.currentTime,.1);if(sfxBus)sfxBus.gain.setTargetAtTime(SET.sv/100,AC.currentTime,.05);
+  $('sMv').value=SET.mv;$('sSv').value=SET.sv;$('sSens').value=SET.sens;$('sSensV').textContent='×'+(SET.sens/100).toFixed(1);$('sVib').checked=SET.vib;
+  document.querySelectorAll('.seg button').forEach(b=>b.classList.toggle('on',b.dataset.d===SET.diff));$('diffNote').textContent=DIFF[SET.diff].name}
+let sfxBus=null;
 
 /* ---------- âm thanh tự tạo ---------- */
 let AC=null,master=null,nbuf=null;
 function initAudio(){
-  try{AC=new(window.AudioContext||window.webkitAudioContext)();master=AC.createGain();master.gain.value=1;const comp=AC.createDynamicsCompressor();comp.threshold.value=-18;comp.ratio.value=4;master.connect(comp).connect(AC.destination);
+  try{AC=new(window.AudioContext||window.webkitAudioContext)();master=AC.createGain();master.gain.value=1;const comp=AC.createDynamicsCompressor();comp.threshold.value=-18;comp.ratio.value=4;master.connect(comp).connect(AC.destination);sfxBus=AC.createGain();sfxBus.gain.value=SET.sv/100;sfxBus.connect(master);
     nbuf=AC.createBuffer(1,AC.sampleRate,AC.sampleRate);const c=nbuf.getChannelData(0);for(let i=0;i<c.length;i++)c[i]=Math.random()*2-1;
     AC.resume();ambient();musicStart();}catch(e){AC=null}
 }
 function env(g,t,a,peak,dec){g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(peak,t+a);g.gain.exponentialRampToValueAtTime(0.0001,t+a+dec)}
-function out(pan){if(!AC.createStereoPanner)return master;const p=AC.createStereoPanner();p.pan.value=clamp(pan,-1,1);p.connect(master);return p}
+function out(pan){if(!AC.createStereoPanner)return sfxBus;const p=AC.createStereoPanner();p.pan.value=clamp(pan,-1,1);p.connect(sfxBus);return p}
 function noise(dur,type,freq,peak,pan=0,q=1,t=AC.currentTime){const s=AC.createBufferSource();s.buffer=nbuf;const f=AC.createBiquadFilter();f.type=type;f.frequency.value=freq;f.Q.value=q;const g=AC.createGain();env(g,t,.004,peak,dur);s.connect(f).connect(g).connect(out(pan));s.start(t);s.stop(t+dur+.05);return f}
 function tone(type,f0,f1,dur,peak,pan=0,t=AC.currentTime){const o=AC.createOscillator();o.type=type;o.frequency.setValueAtTime(f0,t);o.frequency.exponentialRampToValueAtTime(f1,t+dur);const g=AC.createGain();env(g,t,.008,peak,dur);o.connect(g).connect(out(pan));o.start(t);o.stop(t+dur+.05);return o}
 const sfx={
@@ -225,11 +261,11 @@ const sfx={
     o.connect(f).connect(g).connect(out(pan));o.start(t);l.start(t);o.stop(t+dur+.2);l.stop(t+dur+.2);
     if(type==='box')noise(dur,'lowpass',200,.3*vol,pan,1,t)}
 };
-function ambient(){const g=AC.createGain();g.gain.value=.035;g.connect(master);
+function ambient(){const g=AC.createGain();g.gain.value=.035;g.connect(sfxBus);
   [55,55.7,82.4].forEach(fq=>{const o=AC.createOscillator();o.type='sine';o.frequency.value=fq;o.connect(g);o.start()});
   const s=AC.createBufferSource();s.buffer=nbuf;s.loop=true;const f=AC.createBiquadFilter();f.type='bandpass';f.frequency.value=400;f.Q.value=.7;const wg=AC.createGain();wg.gain.value=.06;
   const l=AC.createOscillator();l.frequency.value=.13;const lg=AC.createGain();lg.gain.value=250;l.connect(lg).connect(f.frequency);l.start();
-  s.connect(f).connect(wg).connect(master);s.start()}
+  s.connect(f).connect(wg).connect(sfxBus);s.start()}
 /* ---------- nhạc nền nguyên bản, soạn bằng mã ---------- */
 const MUS={on:true,step:0,next:0,timer:null,g:null,danger:false};
 try{MUS.on=localStorage.getItem('thachma-music')!=='0'}catch(e){}
@@ -291,12 +327,12 @@ function musicTick(){if(!AC)return;
   while(MUS.next<AC.currentTime+.15){
     if(MUS.step%16===0&&(cat!==MUS.cat||cat==='battle'&&w!==MUS.wave)){if(cat==='battle')MUS.wave=w;pickSong(cat)}
     playStep(MUS.step,MUS.next,sp);MUS.next+=sp;MUS.step=(MUS.step+1)%SONGS[MUS.song].len}}
-function musicStart(){if(!AC||MUS.timer)return;MUS.g=AC.createGain();MUS.g.gain.value=MUS.on?.9:0;MUS.g.connect(master);MUS.next=AC.currentTime+.1;MUS.timer=setInterval(musicTick,25)}
-function musicSet(on){MUS.on=on;wake&&wake();try{localStorage.setItem('thachma-music',on?'1':'0')}catch(e){}if(MUS.g)MUS.g.gain.setTargetAtTime(on?.9:0,AC.currentTime,.1);$('music').textContent=on?'Nhạc: bật':'Nhạc: tắt'}
+function musicStart(){if(!AC||MUS.timer)return;MUS.g=AC.createGain();MUS.g.gain.value=MUS.on?SET.mv/100:0;MUS.g.connect(master);MUS.next=AC.currentTime+.1;MUS.timer=setInterval(musicTick,25)}
+function musicSet(on){MUS.on=on;wake&&wake();try{localStorage.setItem('thachma-music',on?'1':'0')}catch(e){}if(MUS.g)MUS.g.gain.setTargetAtTime(on?SET.mv/100:0,AC.currentTime,.1)}
 const wake=()=>{if(AC&&AC.state!=='running')AC.resume().catch(()=>{})};
 ['pointerdown','touchstart','click'].forEach(ev=>addEventListener(ev,wake,{capture:true,passive:true}));
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)wake()});
-const vib=p=>{try{navigator.vibrate&&navigator.vibrate(p)}catch(e){}};
+const vib=p=>{if(!SET.vib)return;try{navigator.vibrate&&navigator.vibrate(p)}catch(e){}};
 
 /* ---------- quái vật (thiết kế nguyên bản, vẽ bằng mã) ---------- */
 const TYPES={
@@ -507,7 +543,7 @@ function swapGun(){if(S.mode!=='play')return;const ks=Object.keys(WEAPONS).filte
 let G;
 function reset(){
   G={hp:100,score:0,wave:0,guns:{pistol:{mag:8}},gun:'pistol',up:{},items:{},combo:0,cd:0,freeze:0,firing:false,res:32,reload:0,mons:[],queue:[],spawnT:0,breakT:0,shake:0,hurt:0,hurtDir:0,flash:0,recoil:0,parts:[],pops:[],heartT:0,t:0,kills:0};
-  G.players=NET.role==='host'?NET.conns.length+1:NET.count;G.runId=Date.now()+'-'+Math.random().toString(36).slice(2,6);G.shots=[];G.endless=false;G.mod=null;G.calm=0;MUS.won=false;
+  G.players=NET.role==='host'?NET.conns.length+1:NET.count;G.diff=SET.diff;G.res=Math.round(32*DIFF[SET.diff].ammo);G.runId=Date.now()+'-'+Math.random().toString(36).slice(2,6);G.shots=[];G.endless=false;G.mod=null;G.calm=0;MUS.won=false;
   if(NET.role!=='guest')startWave(1);hud();
 }
 const MODS=[
@@ -523,7 +559,7 @@ const isBoss=n=>n===WAVES||n>WAVES&&n%5===0;
 function startWave(n){
   const last=G.mod;G.mod=n===1?null:MODS.filter(m=>m.id!==last)[Math.floor(Math.random()*(MODS.length-1))].id;
   G.pattern=n===1?'scatter':PATTERNS[Math.floor(Math.random()*PATTERNS.length)];G.packC=rnd(-.7,.7)*ARC;G.flip=Math.random()<.5;G.nSp=0;
-  G.wave=n;const c=Math.round((3+n*3)*(1+.5*((G.players||1)-1))*(G.mod==='swarm'?1.5:1)),q=[];
+  G.wave=n;const c=Math.round((3+n*3)*(1+.5*((G.players||1)-1))*(G.mod==='swarm'?1.5:1)*DF().cnt),q=[];
   const cc=isBoss(n)?Math.round(c*.4):c;
   for(let i=0;i<cc;i++)q.push(n>=2&&Math.random()<Math.min(.5,.12+n*.07)?'sock':'jelly');
   if(n===4)q.push('box');if(n>=6&&!isBoss(n))for(let i=0;i<Math.floor(n/3);i++)q.push('box');
@@ -539,7 +575,7 @@ function spawn(type){
   else if(G.pattern==='pack'){if(G.nSp%4===0)G.packC=rnd(-.7,.7)*ARC;a=clamp(G.packC+rnd(-.2,.2),-ARC,ARC)}
   else if(G.pattern==='center')a=rnd(-.35,.35)*ARC;else a=rnd(-ARC,ARC)*.92;
   const hp=Math.max(1,T.hp+(md==='giant'?1:0)-(md==='swarm'&&T.hp>1?1:0)),gold=Math.random()<.08;
-  G.mons.push({id:NET.nextId++,type,T,a,d:rnd(20,26),hp,mx:hp,sc:rnd(.88,1.12)*(md==='giant'?1.35:1),gold,spd:T.spd*Math.min(2.2,1+(G.wave-1)*.12)*rnd(.85,1.15)*(md==='rush'?1.35:1),ph:rnd(0,6),hit:0,groan:rnd(.5,3),box:null});
+  G.mons.push({id:NET.nextId++,type,T,a,d:rnd(20,26),hp,mx:hp,sc:rnd(.88,1.12)*(md==='giant'?1.35:1),gold,spd:T.spd*Math.min(2.2,1+(G.wave-1)*.12)*rnd(.85,1.15)*(md==='rush'?1.35:1)*DF().spd,ph:rnd(0,6),hit:0,groan:rnd(.5,3),box:null});
 }
 let msgT=0;
 function banner(a,b){$('msg').innerHTML='';$('msg').append(a);if(b){const s=document.createElement('small');s.textContent=b;$('msg').append(s)}$('msg').classList.add('on');msgT=2.2}
@@ -733,7 +769,7 @@ function drawOverlay(dt){
 let last=performance.now();
 function loop(now){
   const dt=Math.min(.05,(now-last)/1000);last=now;
-  if(S.mode==='play')step(dt);
+  if(S.mode==='play'&&!S.paused)step(dt);
   S.yaw+=wrap(S.tYaw-S.yaw)*(S.gyro?.45:.6);S.pitch+=(S.tPitch-S.pitch)*(S.gyro?.45:.6);
   if(S.mode!=='start'){
     ctx.save();ctx.clearRect(0,0,W,H);
@@ -762,18 +798,18 @@ function step(dt){
     nearest=Math.min(nearest,m.d);
     if((m.groan-=dt)<=0){const rel=wrap(m.a-S.yaw);sfx.groan(m.type,Math.sin(rel)*1.3,clamp(1.4-m.d/20,.15,1.2));m.groan=rnd(2,4.5)*(m.d<8?.6:1)}
     if(m.d<=FENCE+.3){
-      const dmg=m.type==='box'?35:m.type==='sock'?15:20;G.hp-=dmg;hurtFx(m.a);
+      const dmg=Math.round((m.type==='box'?35:m.type==='sock'?15:20)*DF().dmg);G.hp-=dmg;hurtFx(m.a);
       G.mons.splice(G.mons.indexOf(m),1);bcast({t:'hurt',a:m.a});bcast(snap());
       if(G.hp<=0){end(false);return}
     }
   }
-  for(const j of (G.shots=G.shots||[]).slice()){if(!G.freeze)j.d-=5.5*dt;if(j.d<=FENCE){G.shots.splice(G.shots.indexOf(j),1);G.hp-=10;hurtFx(j.a);bcast({t:'hurt',a:j.a});bcast(snap());if(G.hp<=0){end(false);return}}}
+  for(const j of (G.shots=G.shots||[]).slice()){if(!G.freeze)j.d-=5.5*dt;if(j.d<=FENCE){G.shots.splice(G.shots.indexOf(j),1);G.hp-=Math.round(10*DF().dmg);hurtFx(j.a);bcast({t:'hurt',a:j.a});bcast(snap());if(G.hp<=0){end(false);return}}}
   if(G.mons.some(m=>m.type==='boss'))MUS.danger=true;
   if(nearest<7&&(G.heartT-=dt)<=0){sfx.heart();G.heartT=.45+nearest*.08}
   if(!G.queue.length&&!G.mons.length){
     G.shots=[];
     if(G.wave>=WAVES&&!G.endless){end(true);return}
-    G.breakT=9;G.calm=9;G.res+=24;G.hp=Math.min(100,G.hp+10);hud();banner('Đã giữ được!','+24 đạn, +10 máu');bcast({t:'clear'});bcast(snap());showReward()
+    G.breakT=9;G.calm=9;G.res+=Math.round(24*DF().ammo);G.hp=Math.min(100,G.hp+10);hud();banner('Đã giữ được!','+24 đạn, +10 máu');bcast({t:'clear'});bcast(snap());showReward()
   }
 }
 function bossStep(m,dt){
@@ -798,7 +834,7 @@ function guestStep(dt){
 function saveScore(){let lb=[];try{lb=JSON.parse(localStorage.getItem('thachma-lb')||'[]')}catch(e){}
   lb=lb.filter(e=>e.id!==G.runId);lb.push({id:G.runId,s:G.score,w:G.wave,e:G.endless?1:0,d:Date.now()});lb.sort((a,b)=>b.s-a.s);lb=lb.slice(0,10);
   try{localStorage.setItem('thachma-lb',JSON.stringify(lb))}catch(e){}return lb}
-function contEndless(){if(!G)return;G.endless=true;MUS.won=false;S.mode='play';showScreen(null);G.breakT=9;G.calm=9;G.res+=24;hud();banner('Chế độ vô tận','Trùm quay lại mỗi 5 đợt');showReward();bcast({t:'cont'})}
+function contEndless(){if(!G)return;G.endless=true;MUS.won=false;S.mode='play';showScreen(null);G.breakT=9;G.calm=9;G.res+=Math.round(24*DF().ammo);hud();banner('Chế độ vô tận','Trùm quay lại mỗi 5 đợt');showReward();bcast({t:'cont'})}
 function end(win,info){
   MUS.won=!!win;$('reward').hidden=true;rwT=0;G.firing=false;
   if(info){G.kills=info.k;G.score=info.sc;G.wave=info.w}
@@ -846,8 +882,23 @@ $('fire').addEventListener('pointerdown',e=>{e.stopPropagation();if(G)G.firing=t
 ['pointerup','pointercancel','pointerleave'].forEach(ev=>$('fire').addEventListener(ev,()=>{if(G)G.firing=false}));
 $('swap').addEventListener('pointerdown',e=>{e.stopPropagation();swapGun()});
 $('reload').addEventListener('pointerdown',e=>{e.stopPropagation();reload()});
-$('music').addEventListener('pointerdown',e=>{e.stopPropagation();musicSet(!MUS.on)});
-musicSet(MUS.on);
+MUS.on=true;
+function openSet(){const inGame=S.mode==='play';$('settings').hidden=false;$('setTitle').textContent=inGame?'Tạm dừng':'Cài đặt';
+  $('resumeBtn').textContent=inGame?'Tiếp tục':'Xong';$('quitBtn').hidden=!inGame;
+  const team=NET.role!=='solo';S.paused=inGame&&!team;if(G)G.firing=false;
+  $('setNote').textContent=inGame&&team?'Đang chơi chung nên trận vẫn tiếp diễn.':'';
+  document.querySelectorAll('.seg button').forEach(b=>b.disabled=inGame||NET.role==='guest');
+  applySet();if(inGame)$('diffNote').textContent+=' · đổi độ khó ở trận sau'}
+function closeSet(){$('settings').hidden=true;S.paused=false}
+$('pauseBtn').addEventListener('pointerdown',e=>{e.stopPropagation();openSet()});
+$('setBtn').addEventListener('click',openSet);
+$('resumeBtn').addEventListener('click',closeSet);
+$('quitBtn').addEventListener('click',()=>{closeSet();if(G){G.firing=false}$('reward').hidden=true;rwT=0;netReset();S.mode='start';showScreen('start');$('bossbar').hidden=true});
+[['sMv','mv'],['sSv','sv'],['sSens','sens']].forEach(([id,k])=>$(id).addEventListener('input',e=>{SET[k]=+e.target.value;saveSet()}));
+$('sVib').addEventListener('change',e=>{SET.vib=e.target.checked;saveSet();vib(40)});
+document.querySelectorAll('.seg button').forEach(b=>b.addEventListener('click',()=>{SET.diff=b.dataset.d;saveSet()}));
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&S.mode==='play'&&NET.role==='solo')openSet()});
+applySet();
 $('recenter').addEventListener('pointerdown',e=>{e.stopPropagation();if(S.gyro)S.yaw0=S.rawYaw;else S.tYaw=S.tPitch=0;hint('Đã căn giữa hướng nhìn',1.2)});
 addEventListener('keydown',e=>{if(e.code==='Space')shoot();if(e.key==='q'||e.key==='Q')swapGun();if(e.key==='1')useItem('bomb');if(e.key==='2')useItem('freeze');if(e.key==='3')useItem('repair');if(e.key==='r'||e.key==='R')reload()});
 
