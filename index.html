@@ -20,11 +20,11 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--
 .nocam #cam{display:none}
 #cv{position:fixed;inset:0;width:100%;height:100%;display:block}
 #hud{position:fixed;inset:0;pointer-events:none;padding:max(10px,env(safe-area-inset-top)) 14px max(14px,env(safe-area-inset-bottom))}
-.top{display:flex;gap:10px;align-items:center;justify-content:space-between}
-.hp{flex:1;max-width:190px;height:16px;border-radius:9px;background:#0008;border:2px solid #fff3;overflow:hidden}
+.top{display:flex;gap:8px;align-items:center;justify-content:space-between}
+.hp{flex:1;max-width:160px;min-width:50px;height:16px;border-radius:9px;background:#0008;border:2px solid #fff3;overflow:hidden}
 .hp i{display:block;height:100%;width:100%;background:linear-gradient(90deg,var(--pink),#ffb13d);transition:width .2s}
 .tag{font-weight:800;font-size:17px;text-shadow:0 2px 0 #0009;white-space:nowrap}
-#recenter{pointer-events:auto;font:700 13px "Baloo 2",sans-serif;color:var(--ink);background:#0007;border:2px solid #fff4;border-radius:20px;padding:6px 12px;min-height:36px}
+#recenter,.pill{pointer-events:auto;font:700 13px "Baloo 2",sans-serif;color:var(--ink);background:#0007;border:2px solid #fff4;border-radius:20px;padding:5px 10px;min-height:36px;white-space:nowrap}
 .bottom{position:absolute;left:14px;right:14px;bottom:max(14px,env(safe-area-inset-bottom));display:flex;align-items:flex-end;justify-content:space-between;gap:12px}
 .ammo{font-weight:800;font-size:15px;text-shadow:0 2px 0 #000a}
 .ammo b{font-size:30px;line-height:1}
@@ -60,7 +60,7 @@ h1{font:400 clamp(44px,13vw,72px)/1 "Rubik Wet Paint",cursive;color:var(--goo);m
     <div class="hp"><i id="hpbar"></i></div>
     <div class="tag" id="wavetag">Đợt 1/5</div>
     <div class="tag" id="score">0</div>
-    <button id="recenter">Căn giữa</button>
+    <button id="music" class="pill">Nhạc: bật</button><button id="recenter" class="pill">Căn giữa</button>
   </div>
   <div class="bottom">
     <button class="btn" id="reload">NẠP</button>
@@ -137,7 +137,7 @@ let AC=null,master=null,nbuf=null;
 function initAudio(){
   try{AC=new(window.AudioContext||window.webkitAudioContext)();master=AC.createGain();master.gain.value=.9;master.connect(AC.destination);
     nbuf=AC.createBuffer(1,AC.sampleRate,AC.sampleRate);const c=nbuf.getChannelData(0);for(let i=0;i<c.length;i++)c[i]=Math.random()*2-1;
-    AC.resume();ambient();}catch(e){AC=null}
+    AC.resume();ambient();musicStart();}catch(e){AC=null}
 }
 function env(g,t,a,peak,dec){g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(peak,t+a);g.gain.exponentialRampToValueAtTime(0.0001,t+a+dec)}
 function out(pan){if(!AC.createStereoPanner)return master;const p=AC.createStereoPanner();p.pan.value=clamp(pan,-1,1);p.connect(master);return p}
@@ -159,11 +159,30 @@ const sfx={
     o.connect(f).connect(g).connect(out(pan));o.start(t);l.start(t);o.stop(t+dur+.2);l.stop(t+dur+.2);
     if(type==='box')noise(dur,'lowpass',200,.3*vol,pan,1,t)}
 };
-function ambient(){const g=AC.createGain();g.gain.value=.05;g.connect(master);
+function ambient(){const g=AC.createGain();g.gain.value=.035;g.connect(master);
   [55,55.7,82.4].forEach(fq=>{const o=AC.createOscillator();o.type='sine';o.frequency.value=fq;o.connect(g);o.start()});
   const s=AC.createBufferSource();s.buffer=nbuf;s.loop=true;const f=AC.createBiquadFilter();f.type='bandpass';f.frequency.value=400;f.Q.value=.7;const wg=AC.createGain();wg.gain.value=.06;
   const l=AC.createOscillator();l.frequency.value=.13;const lg=AC.createGain();lg.gain.value=250;l.connect(lg).connect(f.frequency);l.start();
   s.connect(f).connect(wg).connect(master);s.start()}
+/* ---------- nhạc nền nguyên bản, soạn bằng mã ---------- */
+const MUS={on:true,step:0,next:0,timer:null,g:null,danger:false};
+try{MUS.on=localStorage.getItem('thachma-music')!=='0'}catch(e){}
+const BASS=[45,0,45,52,48,0,45,0,43,0,43,50,44,0,40,0];
+const MEL=[69,0,72,0,76,0,75,0,76,0,0,72,71,0,68,0,69,0,72,0,76,0,79,0,78,0,75,0,76,0,0,0];
+const mtof=m=>440*Math.pow(2,(m-69)/12);
+function note(type,m,t,dur,peak,dest){const o=AC.createOscillator();o.type=type;o.frequency.value=mtof(m);const g=AC.createGain();g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(peak,t+.01);g.gain.exponentialRampToValueAtTime(.0001,t+dur);o.connect(g).connect(dest);o.start(t);o.stop(t+dur+.05)}
+function drum(t,dest,kick){if(kick){const o=AC.createOscillator();o.frequency.setValueAtTime(130,t);o.frequency.exponentialRampToValueAtTime(42,t+.18);const g=AC.createGain();g.gain.setValueAtTime(.5,t);g.gain.exponentialRampToValueAtTime(.0001,t+.22);o.connect(g).connect(dest);o.start(t);o.stop(t+.25)}
+  else{const n=AC.createBufferSource();n.buffer=nbuf;const f=AC.createBiquadFilter();f.type='highpass';f.frequency.value=7000;const g=AC.createGain();g.gain.setValueAtTime(.12,t);g.gain.exponentialRampToValueAtTime(.0001,t+.05);n.connect(f).connect(g).connect(dest);n.start(t,Math.random()*.5);n.stop(t+.06)}}
+function playStep(s,t){const d=MUS.g,b=BASS[s%16];
+  if(b)note('triangle',b,t,.28,.32,d);
+  const m=MEL[s];if(m){note('sine',m,t,.7,.1,d);note('sine',m+12,t,.35,.035,d)}
+  if(s%8===0)drum(t,d,true);if(s%4===2)drum(t,d,false);
+  if(MUS.danger){if(s%2)note('sawtooth',57+(s%4===1?0:1),t,.09,.05,d);if(s%8===4)drum(t,d,true)}}
+function musicTick(){if(!AC)return;const bpm=92+((G&&G.wave)||0)*6+(MUS.danger?16:0),sp=60/bpm/4;
+  if(MUS.next<AC.currentTime)MUS.next=AC.currentTime+.05;
+  while(MUS.next<AC.currentTime+.15){playStep(MUS.step,MUS.next);MUS.next+=sp;MUS.step=(MUS.step+1)%32}}
+function musicStart(){if(!AC||MUS.timer)return;MUS.g=AC.createGain();MUS.g.gain.value=MUS.on?.45:0;MUS.g.connect(master);MUS.next=AC.currentTime+.1;MUS.timer=setInterval(musicTick,25)}
+function musicSet(on){MUS.on=on;try{localStorage.setItem('thachma-music',on?'1':'0')}catch(e){}if(MUS.g)MUS.g.gain.setTargetAtTime(on?.45:0,AC.currentTime,.1);$('music').textContent=on?'Nhạc: bật':'Nhạc: tắt'}
 const vib=p=>{try{navigator.vibrate&&navigator.vibrate(p)}catch(e){}};
 
 /* ---------- quái vật (thiết kế nguyên bản, vẽ bằng mã) ---------- */
@@ -345,7 +364,7 @@ function step(dt){
   if(G.reload>0&&(G.reload-=dt)<=0){const n=Math.min(MAG-G.mag,G.res);G.mag+=n;G.res-=n;G.reload=0;hud()}
   if(G.breakT>0){if((G.breakT-=dt)<=0)startWave(G.wave+1);return}
   if(G.queue.length&&(G.spawnT-=dt)<=0){spawn(G.queue.pop());G.spawnT=Math.max(.7,2.6-G.wave*.35)*rnd(.6,1.3)}
-  let nearest=99;
+  let nearest=99;MUS.danger=G.mons.some(m=>m.d<8);
   for(const m of G.mons.slice()){
     m.d-=m.spd*dt;m.hit=Math.max(0,m.hit-dt);
     if(m.type==='sock')m.a=clamp(m.a+Math.sin(G.t*2.5+m.ph)*.35*dt,-ARC,ARC);
@@ -395,6 +414,8 @@ $('startBtn').addEventListener('click',begin);
 $('againBtn').addEventListener('click',go);
 $('fire').addEventListener('pointerdown',e=>{e.stopPropagation();shoot()});
 $('reload').addEventListener('pointerdown',e=>{e.stopPropagation();reload()});
+$('music').addEventListener('pointerdown',e=>{e.stopPropagation();musicSet(!MUS.on)});
+musicSet(MUS.on);
 $('recenter').addEventListener('pointerdown',e=>{e.stopPropagation();if(S.gyro)S.yaw0=S.rawYaw;else S.tYaw=S.tPitch=0;hint('Đã căn giữa hướng nhìn',1.2)});
 addEventListener('keydown',e=>{if(e.code==='Space')shoot();if(e.key==='r'||e.key==='R')reload()});
 
