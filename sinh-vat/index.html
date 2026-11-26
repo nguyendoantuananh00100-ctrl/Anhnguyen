@@ -22,6 +22,8 @@ h1 span{color:var(--acc)}
 h2{font-size:18px;margin:22px 0 10px;color:var(--mut);font-weight:600}
 p{line-height:1.5}
 .lead{color:var(--mut);margin:0 0 18px}
+.daily{background:linear-gradient(135deg,#3a2f12,#2a2340);border:1px solid #6b5a22;border-radius:16px;padding:12px 14px;margin:0 0 12px;font-size:14px;line-height:1.5}.daily:empty{display:none}.daily b{color:#ffd76b}.daily small{display:block;color:var(--mut);font-size:12.5px}.daily.done{border-color:#2f7a5e;background:linear-gradient(135deg,#123a2c,#2a2340)}
+.evo{margin-top:10px;width:100%}
 .big{display:flex;align-items:center;gap:12px;width:100%;padding:16px 18px;border-radius:16px;background:var(--panel);margin:0 0 10px;font-size:17px;font-weight:600;text-align:left}
 .big small{display:block;font-weight:400;color:var(--mut);font-size:13px;margin-top:2px}
 .big .ic{font-size:26px;width:34px;text-align:center}
@@ -93,6 +95,7 @@ input[type=range]{width:100%;accent-color:var(--acc)}
 .elb small{display:block;color:var(--mut);margin-top:2px}
 .card .el{position:absolute;top:6px;left:6px;font-size:16px;background:rgba(0,0,0,.45);border-radius:10px;padding:1px 5px}
 .card .el.rare{background:linear-gradient(90deg,#a066ff,#ffb547)}
+.gene{margin-top:10px;background:var(--panel2);border-radius:12px;padding:10px 12px;font-size:13px;line-height:1.55}.gene:empty{display:none}.gene b{font-size:14px}.gene .up{color:#7ee0c3}.gene .dn{color:#ff8a8a}
 .spc{margin-top:10px;background:var(--panel2);border-radius:12px;padding:10px 12px;font-size:14px}
 #roster{display:flex;gap:8px;overflow-x:auto;padding:4px 2px 8px;scrollbar-width:none}
 #roster::-webkit-scrollbar{display:none}
@@ -154,6 +157,7 @@ input[type=range]{width:100%;accent-color:var(--acc)}
 <div class="scr solid on" id="home">
   <div class="who"><h1>Tranh <span>Sống</span></h1><button class="pill" id="who">🦊 ▾</button></div>
   <p class="lead">Vẽ một sinh vật lên giấy, chụp lại, và xem nó sống dậy ngay trong phòng của bạn.</p>
+  <div class="daily" id="daily"></div>
   <button class="big main" id="goScan"><span class="ic">📷</span><span>Chụp tranh vẽ<small>Đặt tờ giấy trên mặt bàn sáng, chụp thẳng từ trên xuống</small></span></button>
   <button class="big" id="goFile"><span class="ic">🖼️</span><span>Chọn ảnh có sẵn<small>Ảnh chụp bức vẽ trong máy</small></span></button>
   <button class="big" id="goPad"><span class="ic">✏️</span><span>Vẽ ngay trên điện thoại<small>Không có giấy bút? Vẽ bằng ngón tay</small></span></button>
@@ -179,7 +183,7 @@ input[type=range]{width:100%;accent-color:var(--acc)}
 
 <!-- VẼ -->
 <div class="scr solid" id="pad">
-  <div class="row" style="margin-bottom:12px"><button class="btn ghost" id="padBack">‹ Về</button><span class="grow" style="text-align:center;font-weight:600">Vẽ một sinh vật</span><button class="btn ghost" id="padUndo">↶</button></div>
+  <div class="row" style="margin-bottom:12px"><button class="btn ghost" id="padBack">‹ Về</button><span class="grow" style="text-align:center;font-weight:600" id="padTitle">Vẽ một sinh vật</span><button class="btn ghost" id="padUndo">↶</button></div>
   <div id="padWrap"><canvas id="padCv"></canvas></div>
   <div class="row" style="justify-content:center;margin:14px 0" id="padCols"></div>
   <div class="row" style="justify-content:center;gap:14px;margin-bottom:14px" id="padSizes"></div>
@@ -217,7 +221,9 @@ input[type=range]{width:100%;accent-color:var(--acc)}
     <div class="lab" id="traitT">Tính cách</div>
     <div id="traits" style="font-size:15px"></div>
     <div id="stats" style="margin-top:8px"></div>
+    <div class="gene" id="geneLine"></div>
     <div class="spc" id="spcLine"></div>
+    <button class="btn evo" id="evoBtn" hidden>🌱 Tiến hoá</button>
     <div class="intro" id="intro"></div>
     <div class="row" style="margin-top:18px"><button class="btn bad" id="bornDel" hidden>Xóa</button><button class="btn" id="bornBack">‹ Về nhà</button><button class="btn pri grow" id="bornGo">Thả vào phòng 🏠</button></div>
   </div>
@@ -570,11 +576,78 @@ function seedRand(seed){let s=seed>>>0||1;return()=>{s^=s<<13;s^=s>>>17;s^=s<<5;
 function persona(c){
   const R=seedRand(c.id.split('').reduce((a,ch)=>a*31+ch.charCodeAt(0)|0,7));
   const tr=[];while(tr.length<3){const t=TRAITS[R()*TRAITS.length|0];if(!tr.includes(t))tr.push(t)}
-  c.traits=tr;c.stats={sucManh:2+(R()*8|0),tocDo:2+(R()*8|0),deThuong:3+(R()*8|0),phepThuat:1+(R()*10|0)};for(const k in c.stats)c.stats[k]=Math.min(10,c.stats[k]);
+  c.traits=tr;c.stats={sucManh:2+(R()*8|0),tocDo:2+(R()*8|0),deThuong:3+(R()*8|0),phepThuat:1+(R()*10|0)};for(const k in c.stats)c.stats[k]=Math.min(10,c.stats[k]);applyGene(c);
   c.lines=['Chào cậu! Tớ là '+c.name+' nè!','Cảm ơn cậu đã vẽ ra tớ!','Cho tớ ăn bánh quy đi mà!','Hihi, nhột quá!','Tớ là '+c.vi+' '+tr[0]+' nhất quả đất!',...MVLINE[c.mv],...(c.mv2?MVLINE[c.mv2].slice(0,1):[])];
   if(c.newSp)c.lines.push('Tớ là loài mới, chưa ai từng thấy đâu!');
   if(c.hybrid)c.lines.push('Nửa '+viOf(c.hybrid[0])+' nửa '+viOf(c.hybrid[1])+', ngầu chưa!');
   c.intro=cap(c.name)+' là '+(c.newSp?'một loài mới tinh chưa ai từng thấy, ':c.hybrid?'con lai giữa '+viOf(c.hybrid[0])+' và '+viOf(c.hybrid[1])+', ':'một '+(c.vi||'sinh vật bí ẩn')+' ')+tr[0]+', '+tr[1]+' và '+tr[2]+'.'+(c.mv2?' Nó vừa biết '+MV[c.mv].toLowerCase()+' vừa biết '+MV[c.mv2].toLowerCase()+'.':'')}
+/* ================= gen tranh vẽ: hình dạng nét vẽ quyết định sức mạnh ================= */
+// đọc tranh đã cắt: số chân, mũi nhọn (tai, sừng, gai, đuôi), độ tròn, độ dài, số màu, độ chi tiết
+function geneOf(cv){const S=128,w0=cv.width,h0=cv.height,k=S/Math.max(w0,h0),w=Math.max(8,Math.round(w0*k)),h=Math.max(8,Math.round(h0*k)),t=mk(w,h),x=t.getContext('2d');x.drawImage(cv,0,0,w,h);
+  const d=x.getImageData(0,0,w,h).data,M=new Uint8Array(w*h);let A=0,cx=0,cy=0,x0=w,x1=0,y0=h,y1=0;
+  for(let y=0;y<h;y++)for(let i=0;i<w;i++){if(d[(y*w+i)*4+3]>128){M[y*w+i]=1;A++;cx+=i;cy+=y;x0=Math.min(x0,i);x1=Math.max(x1,i);y0=Math.min(y0,y);y1=Math.max(y1,y)}}
+  if(A<20)return null;cx/=A;cy/=A;const bw=x1-x0+1,bh=y1-y0+1;
+  // bán kính theo 72 hướng
+  const N=72,rr=new Float32Array(N);let Rmax=0;for(let a=0;a<N;a++){const an=a/N*Math.PI*2,dx=Math.cos(an),dy=Math.sin(an);let r=0;for(let q=0;q<S;q+=.5){const xx=Math.round(cx+dx*q),yy=Math.round(cy+dy*q);if(xx<0||yy<0||xx>=w||yy>=h)break;if(M[yy*w+xx])r=q}rr[a]=r;Rmax=Math.max(Rmax,r)}
+  const round=Math.min(1,A/(Math.PI*Rmax*Rmax)*1.15);
+  // mũi nhọn: đỉnh nhô ra rõ so với hai bên, không tính phía dưới (chân)
+  let spikes=0;for(let a=0;a<N;a++){const r=rr[a];if(r<Rmax*.45)continue;let ok=true,side=0;for(let o=1;o<=4;o++){if(rr[(a+o)%N]>r||rr[(a-o+N)%N]>=r){ok=false;break}}if(!ok)continue;
+    for(const o of[5,6])side+=rr[(a+o)%N]+rr[(a-o+N)%N];side/=4;const an=a/N*360;if(r>side*1.16&&!(an>50&&an<130))spikes++}
+  // chân: đếm các đoạn hẹp tách rời ở phần dưới
+  // chân vẽ bằng 2 nét (chưa khép đáy) thì 2 nét mảnh tính là 1 chân
+  let legs=0;for(const fr of[.86,.9,.94]){const y=Math.min(h-1,Math.round(y0+bh*fr));let seg=0,thin=0,run=0;for(let i=0;i<=w;i++){const v=i<w&&M[y*w+i];if(v)run++;else{if(run>0&&run<bw*.3){if(run<=Math.max(2,bw*.025))thin++;else seg++}run=0}}legs=Math.max(legs,seg+Math.ceil(thin/2))}
+  legs=Math.min(8,legs);
+  // màu: số nhóm màu khác nhau; chi tiết: nét đậm bên trong thân
+  // màu tô: chỉ tính vùng tô thành mảng (không tính nét bút mảnh); chi tiết: nét bên trong thân (mắt, miệng, hoa văn)
+  const bin=new Int8Array(w*h).fill(-1);let ink=0;for(let i=0;i<w*h;i++){if(!M[i])continue;const r=d[i*4]/255,g=d[i*4+1]/255,b=d[i*4+2]/255,mx=Math.max(r,g,b),mn=Math.min(r,g,b),sat=mx?(mx-mn)/mx:0,L=.3*r+.59*g+.11*b;
+    if(L<.42||(L<.6&&sat<.45)){const y=(i/w)|0,xi=i%w;if(xi>2&&y>2&&xi<w-3&&y<h-3&&M[i-2]&&M[i+2]&&M[i-2*w]&&M[i+2*w]&&M[i-3]&&M[i+3]&&M[i-3*w]&&M[i+3*w])ink++}
+    if(sat<.25||mx<.3)continue;let hu;if(mx===r)hu=((g-b)/(mx-mn)+6)%6;else if(mx===g)hu=(b-r)/(mx-mn)+2;else hu=(r-g)/(mx-mn)+4;bin[i]=Math.floor(hu*2)%12}
+  const hb=new Float32Array(12);for(let y=1;y<h-1;y++)for(let i=1;i<w-1;i++){const k=y*w+i,v=bin[k];if(v<0)continue;if(bin[k-1]===v&&bin[k+1]===v&&bin[k-w]===v&&bin[k+w]===v)hb[v]++}
+  let colors=0;for(let i=0;i<12;i++)if(hb[i]>A*.03)colors++;
+  const elong=Math.max(bw/bh,bh/bw);
+  return{legs,spikes:Math.min(9,spikes),round:+round.toFixed(3),elong:+elong.toFixed(2),colors,detail:+(ink/A).toFixed(3)}}
+// đổi gen thành chỉ số + lý do (mỗi con lệch thêm chút ngẫu nhiên cố định để không con nào giống hệt)
+const GS={sucManh:'Sức mạnh',tocDo:'Tốc độ',deThuong:'Dễ thương',phepThuat:'Phép thuật',all:'mọi chỉ số'};
+function applyGene(c){const g=c.gene;if(!g)return;const why=[],st={sucManh:2,tocDo:2,deThuong:3,phepThuat:3},add=(k,v,ic,t)=>{v=Math.round(v);if(!v)return;st[k]+=v;why.push([ic,t,k,v])};
+  add('sucManh',Math.min(4,g.spikes*1.1),'🔺',g.spikes+' mũi nhọn (tai, sừng, gai, đuôi)');
+  if(g.round<.55)add('sucManh',(.55-g.round)*5,'💪','dáng gân guốc, không tròn');
+  add('tocDo',Math.min(4,g.legs*1),'🦵',g.legs+' chân');
+  if(g.elong>1.5)add('tocDo',Math.min(2,(g.elong-1.3)*2),'📏','thân dài thon');
+  const mvB={f:2,h:1,t:-1}[c.mv]||0;if(mvB)add('tocDo',mvB,c.mv==='f'?'🪽':c.mv==='h'?'🦘':'🐍',c.mv==='f'?'biết bay':c.mv==='h'?'nhảy tưng tưng':'phải trườn');
+  if(g.round>.5)add('deThuong',(g.round-.5)*9,'⚪','thân tròn trịa');
+  if(g.spikes<=1)add('deThuong',2,'🧸','mềm mại, ít góc nhọn');
+  if(g.detail>.004)add('deThuong',1,'👀','có mắt mũi rõ ràng');
+  add('phepThuat',Math.min(5,g.colors*1.4),'🎨',g.colors?g.colors+' màu':'');
+  if(g.detail>.02)add('phepThuat',Math.min(3,(g.detail-.01)*40),'✏️','nhiều nét chi tiết');
+  if(!g.colors)add('phepThuat',-1,'⚫','chưa tô màu (tô màu để phép mạnh hơn)');
+  if(c.daily&&DAILY[c.daily.k])add(DAILY[c.daily.k].st,1,'📝','vẽ đúng đề ngày '+c.daily.d);
+  const R=seedRand(hashStr(c.id+':gen'));for(const k in st){const j=R();st[k]+=j<.2?-1:j>.8?1:0}
+  if(c.evo){for(const k in st)st[k]+=c.evo;why.push(['🌱','tiến hoá '+c.evo+' lần','all',c.evo])}
+  for(const k in st)st[k]=clamp(st[k],1,10);c.stats=st;c.geneWhy=why}
+/* ---- đề vẽ mỗi ngày ---- */
+const DAILY={
+  chan4:{t:'Sinh vật có từ 4 chân trở lên',st:'tocDo',ok:(c,g)=>g.legs>=4},
+  tron:{t:'Sinh vật tròn vo như quả bóng',st:'deThuong',ok:(c,g)=>g.round>=.65},
+  mau3:{t:'Sinh vật được tô ít nhất 3 màu',st:'phepThuat',ok:(c,g)=>g.colors>=3},
+  gai:{t:'Sinh vật đầy gai nhọn (5 mũi nhọn trở lên)',st:'sucManh',ok:(c,g)=>g.spikes>=5},
+  bay:{t:'Một loài biết bay',st:'tocDo',ok:c=>c.mv==='f'||c.mv2==='f'},
+  boi:{t:'Một loài sống dưới nước',st:'phepThuat',ok:c=>c.mv==='s'||c.mv2==='s'},
+  dai:{t:'Sinh vật có thân thật dài',st:'tocDo',ok:(c,g)=>g.elong>=2},
+  khongchan:{t:'Sinh vật không có cái chân nào',st:'phepThuat',ok:(c,g)=>g.legs===0},
+  bachan:{t:'Sinh vật có đúng 3 chân',st:'sucManh',ok:(c,g)=>g.legs===3},
+  hoavan:{t:'Sinh vật có thật nhiều hoa văn, chi tiết',st:'phepThuat',ok:(c,g)=>g.detail>=.04},
+  lai:{t:'Một con lai giữa hai loài',st:'deThuong',ok:c=>!!c.hybrid},
+  loaimoi:{t:'Một loài mới chưa ai từng thấy',st:'phepThuat',ok:c=>!!c.newSp},
+  motmau:{t:'Sinh vật chỉ tô đúng 1 màu',st:'deThuong',ok:(c,g)=>g.colors===1},
+  sung:{t:'Sinh vật có 2 đến 4 cái sừng hoặc tai nhọn',st:'sucManh',ok:(c,g)=>g.spikes>=2&&g.spikes<=4}};
+function today(){const d=new Date();return d.getDate()+'/'+(d.getMonth()+1)+'/'+d.getFullYear()}
+function dailyKey(){const ks=Object.keys(DAILY);return ks[hashStr('debai:'+today())%ks.length]}
+function dailyDone(){return(PL(CURP).daily||'')===today()}
+function renderDaily(){const e=$('daily'),x=DAILY[dailyKey()],done=dailyDone();e.className='daily'+(done?' done':'');e.innerHTML='<div></div><small></small>';
+  e.firstChild.innerHTML='📝 Đề vẽ hôm nay: <b></b>'+(done?' ✓':'');e.querySelector('b').textContent=x.t;
+  e.querySelector('small').textContent=done?'Bạn đã vẽ đúng đề hôm nay rồi! Mai có đề mới nhé.':'Vẽ đúng đề: cơ hội ra hệ hiếm cao gấp 4 lần và được +1 '+GS[x.st]+'.'}
+function checkDaily(c){if(dailyDone()||!c.gene)return false;const k=dailyKey();if(!DAILY[k].ok(c,c.gene))return false;
+  c.daily={k,d:today()};const p=PLAYERS.find(q=>q.id===CURP);if(p){p.daily=today();savePl()}return true}
 const ART=/^(cái|con|quả|chiếc|cây|củ|tấm|tờ|bộ|cặp|thỏi|hạt|khẩu|thanh|quyển|bông|đám|ngôi|cơn|đường|nét|người|nàng|bãi|dòng|ngón|bàn|đàn|cánh) /;
 const shortVi=v=>v.replace(ART,'');
 const NEWSP=['Lốm Đốm','Ngoe Nguẩy','Bập Bềnh','Xù Xì','Lúc Lắc','Tí Tởn','Phúng Phính','Lẹt Đẹt','Mũm Mĩm','Ngộ Nghĩnh','Lấp Lánh','Lăng Xăng','Lon Ton','Bì Bõm','Ú Òa','Lắt Léo'];
@@ -650,7 +723,7 @@ function applyAI(c,a){
   if(a.ten)c.name=String(a.ten).slice(0,24);if(a.loai)c.vi=String(a.loai).slice(0,40);if(mv)c.mv=mv;
   const sz={nho:'n',vua:'v',to:'t'}[a.kichCo];if(sz)c.size=sz;if(a.huongMat==='trai')c.face=-1;if(a.huongMat==='phai')c.face=1;
   if(Array.isArray(a.tinhCach)&&a.tinhCach.length)c.traits=a.tinhCach.slice(0,4).map(String);
-  if(a.chiSo)for(const k of['sucManh','tocDo','deThuong','phepThuat'])if(a.chiSo[k])c.stats[k]=clamp(Math.round(a.chiSo[k]),1,10);
+  if(a.chiSo&&!c.gene)for(const k of['sucManh','tocDo','deThuong','phepThuat'])if(a.chiSo[k])c.stats[k]=clamp(Math.round(a.chiSo[k]),1,10);
   if(Array.isArray(a.loiThoai)&&a.loiThoai.length)c.lines=a.loiThoai.slice(0,8).map(s=>String(s).slice(0,90));
   if(a.gioiThieu)c.intro=String(a.gioiThieu).slice(0,200);
   const ch=a.chieu;if(ch&&ch.ten){c.gch={ten:String(ch.ten).slice(0,30),hh:String(ch.hoHet||'').slice(0,50)}}delete c.spc;
@@ -922,7 +995,7 @@ function show(id){SCR=id;document.querySelectorAll('.scr').forEach(e=>e.classLis
   vid.style.display=(id==='scan'||id==='room'||id==='battle')?'block':'none';
   if(id==='home')renderHome();if(window.speechSynthesis&&id!=='room'&&id!=='born')speechSynthesis.cancel()}
 let GALALL=false;
-function renderHome(){
+function renderHome(){renderDaily();
   const me=PL(CURP);$('who').textContent=me.emo+' '+me.name+' ▾';
   const mine=CRE.filter(c=>c.owner===CURP),list=GALALL?CRE:mine;
   $('tabMine').textContent='Của '+me.name+' ('+mine.length+')';$('tabAll').textContent='Mọi người ('+CRE.length+')';
@@ -954,15 +1027,36 @@ const COLS=['#1b1b1b','#e23b3b','#2f6fe4','#2aa84a','#ff9a1f','#9b4de0','#8a5a2b
 COLS.forEach(c=>{const b=document.createElement('button');b.className='dot'+(c===padCol?' on':'');b.style.background=c;b.onclick=()=>{padCol=c;document.querySelectorAll('#padCols .dot').forEach(d=>d.classList.toggle('on',d===b))};$('padCols').appendChild(b)});
 [4,7,14].forEach(s=>{const b=document.createElement('button');b.className='chip'+(s===padSize?' on':'');b.textContent=s===4?'Nét mảnh':s===7?'Vừa':'Đậm';b.onclick=()=>{padSize=s;document.querySelectorAll('#padSizes .chip').forEach(d=>d.classList.toggle('on',d===b))};$('padSizes').appendChild(b)});
 function padRedraw(){const s=pc.width/400;px.setTransform(1,0,0,1,0,0);px.fillStyle='#fff';px.fillRect(0,0,pc.width,pc.height);px.setTransform(s,0,0,s,0,0);px.lineCap=px.lineJoin='round';
+  if(EVO&&EVO.im){const b=EVO.box;px.drawImage(EVO.im,b.x,b.y,b.w,b.h)}
   for(const st of padStrokes){px.strokeStyle=st.c;px.lineWidth=st.s;px.beginPath();st.p.forEach((p,i)=>i?px.lineTo(p[0],p[1]):px.moveTo(p[0],p[1]));if(st.p.length===1)px.lineTo(st.p[0][0]+.1,st.p[0][1]);px.stroke()}}
 function padPt(e){const r=pc.getBoundingClientRect();return[(e.clientX-r.left)/r.width*400,(e.clientY-r.top)/r.height*400]}
 pc.addEventListener('pointerdown',e=>{pc.setPointerCapture(e.pointerId);padCur={c:padCol,s:padSize,p:[padPt(e)]};padStrokes.push(padCur);padRedraw()});
 pc.addEventListener('pointermove',e=>{if(!padCur)return;padCur.p.push(padPt(e));padRedraw()});
 pc.addEventListener('pointerup',()=>padCur=null);pc.addEventListener('pointercancel',()=>padCur=null);
-$('goPad').onclick=()=>{ac();show('pad');const r=pc.getBoundingClientRect();pc.width=pc.height=Math.round(r.width*Math.min(2,devicePixelRatio||1));padRedraw()};
-$('padBack').onclick=()=>show('home');$('padUndo').onclick=()=>{padStrokes.pop();padRedraw()};$('padClear').onclick=()=>{padStrokes=[];padRedraw()};
-$('padDone').onclick=()=>{if(!padStrokes.length){toast('Vẽ gì đó trước đã nhé!');return}const c=mk(560,560),x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,560,560);x.drawImage(pc,80,80,400,400);openCut(c)};
+$('goPad').onclick=()=>{ac();EVO=null;padStrokes=[];$('padTitle').textContent='Vẽ một sinh vật';$('padDone').textContent='Thổi hồn ✨';show('pad');const r=pc.getBoundingClientRect();pc.width=pc.height=Math.round(r.width*Math.min(2,devicePixelRatio||1));padRedraw()};
+$('padBack').onclick=()=>{if(EVO){const c=EVO.c;EVO=null;padStrokes=[];openBorn(c)}else show('home')};$('padUndo').onclick=()=>{padStrokes.pop();padRedraw()};$('padClear').onclick=()=>{padStrokes=[];padRedraw()};
+$('padDone').onclick=()=>{if(!padStrokes.length){toast('Vẽ gì đó trước đã nhé!');return}if(EVO){finishEvo();return}const c=mk(560,560),x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,560,560);x.drawImage(pc,80,80,400,400);openCut(c)};
 
+/* ---- tiến hoá: thắng đủ trận thì vẽ thêm lên chính con vật ---- */
+const EVO_WIN=3,EVO_MAX=3;let EVO=null;
+function openEvo(c){const im=new Image();im.onload=()=>{const a=im.width/im.height,m=250,w=a>=1?m:m*a,h=a>=1?m/a:m;EVO={c,im,box:{x:200-w/2,y:205-h/2,w,h}};padStrokes=[];
+    $('padTitle').textContent='Vẽ thêm cho '+c.name+' (cánh, sừng, hoa văn…)';$('padDone').textContent='Tiến hoá 🌱';ac();show('pad');const r=pc.getBoundingClientRect();pc.width=pc.height=Math.round(r.width*Math.min(2,devicePixelRatio||1));padRedraw();
+    toast('Vẽ thêm bộ phận mới lên '+c.name+'. Nét vẽ mới sẽ đổi sức mạnh của nó!',3200)};im.src=c.img}
+function finishEvo(){const c=EVO.c,S=2,W2=400*S,cv=mk(W2,W2),x=cv.getContext('2d'),b=EVO.box;x.drawImage(EVO.im,b.x*S,b.y*S,b.w*S,b.h*S);x.setTransform(S,0,0,S,0,0);x.lineCap=x.lineJoin='round';
+  for(const st of padStrokes){x.strokeStyle=st.c;x.lineWidth=st.s;x.beginPath();st.p.forEach((p,i)=>i?x.lineTo(p[0],p[1]):x.moveTo(p[0],p[1]));if(st.p.length===1)x.lineTo(st.p[0][0]+.1,st.p[0][1]);x.stroke()}
+  x.setTransform(1,0,0,1,0,0);
+  // lấp giấy vào các vùng kín do nét mới khép lại, rồi cắt sát
+  const id=x.getImageData(0,0,W2,W2),d=id.data,N=W2*W2,out=new Uint8Array(N),st=[];for(let i=0;i<W2;i++)st.push(i,N-1-i,i*W2,i*W2+W2-1);
+  while(st.length){const i=st.pop();if(i<0||i>=N||out[i]||d[i*4+3]>60)continue;out[i]=1;const xx=i%W2;if(xx>0)st.push(i-1);if(xx<W2-1)st.push(i+1);st.push(i-W2,i+W2)}
+  let x0=W2,x1=0,y0=W2,y1=0;for(let i=0;i<N;i++){if(!out[i]&&d[i*4+3]<=60){const a=d[i*4+3]/255;d[i*4]=Math.round(d[i*4]*a+251*(1-a));d[i*4+1]=Math.round(d[i*4+1]*a+247*(1-a));d[i*4+2]=Math.round(d[i*4+2]*a+239*(1-a));d[i*4+3]=255}
+    if(d[i*4+3]>20){const xx=i%W2,yy=(i/W2)|0;x0=Math.min(x0,xx);x1=Math.max(x1,xx);y0=Math.min(y0,yy);y1=Math.max(y1,yy)}}
+  x.putImageData(id,0,0);const pad=6;x0=Math.max(0,x0-pad);y0=Math.max(0,y0-pad);x1=Math.min(W2-1,x1+pad);y1=Math.min(W2-1,y1+pad);
+  const sc=Math.min(1,512/Math.max(x1-x0+1,y1-y0+1)),o=mk(Math.round((x1-x0+1)*sc),Math.round((y1-y0+1)*sc));o.getContext('2d').drawImage(cv,x0,y0,x1-x0+1,y1-y0+1,0,0,o.width,o.height);
+  const old=c.stats?{...c.stats}:{};c.img=o.toDataURL('image/png');c.evo=(c.evo||0)+1;c.gene=geneOf(o);applyGene(c);
+  const t=TEX.get(c.id);if(t){try{if(t.g)gl.deleteTexture(t.g);if(t.m){gl.deleteBuffer(t.m.vb);gl.deleteBuffer(t.m.ib);gl.deleteTexture(t.m.g)}}catch(e){}TEX.delete(c.id)}
+  c.lines=(c.lines||[]).filter(l=>!/^Tớ vừa tiến hoá/.test(l));c.lines.push('Tớ vừa tiến hoá lần '+c.evo+', mạnh hơn rồi nè!');
+  EVO=null;padStrokes=[];saveCre();openBorn(c);const up=Object.keys(GS).filter(k=>k!=='all'&&(c.stats[k]||0)>(old[k]||0)).map(k=>GS[k]).join(', ');
+  setTimeout(()=>{toast('🌱 '+c.name+' đã tiến hoá lần '+c.evo+'!'+(up?' Tăng: '+up:''),3500);[392,523,659,784,1047,1319].forEach((f,i)=>blip(f,f*1.2,.16,'triangle',.1,i*.08));for(let i=0;i<30;i++)R.parts.push({x:rnd(0,W),y:rnd(-20,H*.35),vx:rnd(-30,30),vy:rnd(60,160),t:0,life:2.4,ch:pick(['🌱','✨','🍃','⭐'])})},500)}
 /* ---- cắt ---- */
 let CUT=null;
 function openCut(src){CUT={src,res:null};$('sens').value=50;$('fill').checked=true;show('cut');runCut()}
@@ -981,8 +1075,8 @@ $('cutGo').onclick=async()=>{const r=CUT.res;if(!r||!r.ok)return;
   const g=classify(r.inp),top=g[0];
   const c={id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),img:r.tex.toDataURL('image/png'),guesses:g.slice(0,4).map(([e,p])=>[e,+p.toFixed(3)]),size:'v',face:1,ai:false,created:Date.now(),owner:CURP,wins:0,losses:0};c.face=r.face||1;c.faceAuto=1;
   const sh=shapeMove(r.tex),sec=g[1];c.shape=sh.mv;c.shapeWhy=sh.why;
-  classifyInto(c,top,sec,sh);persona(c);ensureEl(c,r.tex);
-  CRE.unshift(c);saveCre();openBorn(c,true);
+  c.gene=geneOf(r.tex);classifyInto(c,top,sec,sh);const dly=checkDaily(c);persona(c);ensureEl(c,r.tex);
+  CRE.unshift(c);saveCre();openBorn(c,true);if(dly)setTimeout(()=>{toast('📝 Đúng đề hôm nay! Thưởng +1 '+GS[DAILY[c.daily.k].st],3200);[659,784,988,1319].forEach((f,i)=>blip(f,f,.12,'triangle',.1,i*.09))},400);
   if(SET.key||SET.worker)runAI(c,r.tex)};
 
 function classifyInto(c,top,sec,sh){c.hybrid=null;c.newSp=false;c.mv2=null;
@@ -1026,8 +1120,8 @@ function elWeights(c,f){const W={kim:1,moc:1,thuy:1,hoa:1,tho:1},add=(k,v)=>W[k]
 function hashStr(t){let h=2166136261;for(let i=0;i<t.length;i++){h^=t.charCodeAt(i);h=Math.imul(h,16777619)}return h>>>0}
 // tranh chỉ làm nghiêng xác suất; quay ngẫu nhiên theo mã riêng của từng sinh vật. Hệ gộp chỉ chiếm khoảng 8%.
 function rollEl(c,f){const W=elWeights(c,f),R=seedRand(hashStr(c.id+':nguhanh'));const sw=ELK.reduce((a,k)=>a+W[k],0);
-  const cand=[];for(const k of ELK)cand.push([k,.92*W[k]/sw]);
-  const cw=Object.keys(COMBO).map(k=>{const[a,b]=k.split('+');return[k,W[a]*W[b]]}),cs=cw.reduce((a,x)=>a+x[1],0);for(const[k,v]of cw)cand.push([k,.08*v/cs]);
+  const rp=c.daily?.32:.08,cand=[];for(const k of ELK)cand.push([k,(1-rp)*W[k]/sw]);
+  const cw=Object.keys(COMBO).map(k=>{const[a,b]=k.split('+');return[k,W[a]*W[b]]}),cs=cw.reduce((a,x)=>a+x[1],0);for(const[k,v]of cw)cand.push([k,rp*v/cs]);
   let x=R();for(const[k,p]of cand){if((x-=p)<0)return k}return cand[0][0]}
 function ensureEl(c,cv){if(c.el&&c.elLock)return;if(cv){c.elF=elFeat(cv)}c.el=rollEl(c,c.elF||null)}
 /* ---- ra đời ---- */
@@ -1048,7 +1142,7 @@ function renderBorn(){const c=BORN.c;$('nameIn').value=c.name;
     else if(k==='#moi')classifyInto(c,null,null,sh);
     else{const e=g.find(([e])=>viOf(e)===k);c.hybrid=null;c.newSp=false;c.mv2=null;c.vi=k;if(e){c.sp=e[0];c.mv=(DICT[e[0]]||{}).m||c.mv}}
     c.name=c.name;persona(c);c.ai=false;if(!c.elLock)ensureEl(c);saveCre();renderBorn()});
-  chipRow($('mvChips'),Object.entries(MV),c.mv,k=>{c.mv=k;if(c.mv2===k)c.mv2=null;saveCre();renderBorn()});
+  chipRow($('mvChips'),Object.entries(MV),c.mv,k=>{c.mv=k;if(c.mv2===k)c.mv2=null;applyGene(c);saveCre();renderBorn()});
   chipRow($('mv2Chips'),[['','Không'],...Object.entries(MV).filter(([k])=>k!==c.mv)],c.mv2||'',k=>{c.mv2=k||null;saveCre();renderBorn()});
   chipRow($('szChips'),[['n','Nhỏ'],['v','Vừa'],['t','To']],c.size,k=>{c.size=k;saveCre();renderBorn()});
   {const x=elInfo(c.el),e=$('elLine');if(x){e.className='elb'+(x.rare?' rare':'');e.style.borderLeftColor=x.rare?'':x.c;
@@ -1059,14 +1153,19 @@ function renderBorn(){const c=BORN.c;$('nameIn').value=c.name;
   const SN={sucManh:'Sức mạnh',tocDo:'Tốc độ',deThuong:'Dễ thương',phepThuat:'Phép thuật'};
   $('stats').innerHTML=Object.keys(SN).map(k=>`<div class="stat"><span>${SN[k]}</span><i><b style="width:${c.stats[k]*10}%"></b></i><span>${c.stats[k]}</span></div>`).join('');
   $('intro').textContent='“'+(c.intro||'')+'”';
-  {const sp=spcOf(c),e=$('spcLine');e.innerHTML='🌟 Tuyệt kỹ '+(c.el?elName(c.el):'')+': <b></b><br><small class="note"></small>';e.querySelector('b').textContent=sp.ic+' '+sp.ten;e.querySelector('small').textContent=sp.mt+(c.el&&!c.elLock?' · đổi theo hệ khi hệ đổi':'')}
+  {const e=$('geneLine');e.textContent='';if(c.geneWhy&&c.geneWhy.length){const b=document.createElement('b');b.textContent='🧬 Gen tranh vẽ: nét vẽ của bạn quyết định sức mạnh';e.appendChild(b);
+    for(const[ic,t,k,v]of c.geneWhy){const d=document.createElement('div');d.textContent=ic+' '+t+' → '+GS[k]+' ';const sp=document.createElement('span');sp.className=v>0?'up':'dn';sp.textContent=(v>0?'+':'')+v;d.appendChild(sp);e.appendChild(d)}}}
+  {const sp=spcOf(c),e=$('spcLine');e.innerHTML='🌟 Tuyệt kỹ '+(c.el?elName(c.el):'')+': <b></b><br><small class="note"></small>';e.querySelector('b').textContent=sp.ic+' '+sp.ten+(c.evo?' · cấp '+(c.evo+1):'');e.querySelector('small').textContent=sp.mt+(c.evo?' · mạnh hơn '+(c.evo*15)+'% nhờ tiến hoá':'')+(c.el&&!c.elLock?' · đổi theo hệ khi hệ đổi':'')}
   $('aiBtn').hidden=!(SET.key||SET.worker)||c.aiBusy;$('bornDel').hidden=BORN.fresh;
+  {const b=$('evoBtn'),ev=c.evo||0,need=EVO_WIN*(ev+1),w=c.wins||0;b.hidden=BORN.fresh||c.owner!==CURP;b.disabled=ev>=EVO_MAX||w<need;
+    b.textContent=ev>=EVO_MAX?'🌳 Đã tiến hoá tối đa ('+EVO_MAX+' lần)':w>=need?'🌱 Tiến hoá! Vẽ thêm lên '+c.name:'🌱 Tiến hoá: thắng thêm '+(need-w)+' trận ('+w+'/'+need+')'}
   $('bornGo').textContent=ROOM.includes(c.id)?'Gặp nó trong phòng 🏠':'Thả vào phòng 🏠'}
 $('nameIn').oninput=e=>{BORN.c.name=e.target.value.trim()||'Bé';saveCre()};
 $('faceBtn').onclick=()=>{BORN.c.face=-(BORN.c.face||1);BORN.c.faceAuto=1;saveCre();toast('Đã đổi. Sinh vật ở khung trên phải đang nhìn sang phải.')};
 $('aiBtn').onclick=()=>runAI(BORN.c);
 function lockEl(){const c=BORN&&BORN.c;if(c&&!c.elLock){if(!c.el)ensureEl(c);c.elLock=1;saveCre()}}
 $('bornBack').onclick=()=>{lockEl();show('home')};
+$('evoBtn').onclick=()=>{const c=BORN.c;lockEl();openEvo(c)};
 $('bornDel').onclick=()=>{const c=BORN.c;CRE=CRE.filter(x=>x!==c);ROOM=ROOM.filter(i=>i!==c.id);saveCre();show('home')};
 $('bornGo').onclick=()=>{lockEl();const c=BORN.c;const isNew=!ROOM.includes(c.id);if(isNew){ROOM.push(c.id);if(ROOM.length>8)ROOM.shift();saveCre()}enterRoom(c.id)};
 async function runAI(c,tex){
@@ -1310,7 +1409,7 @@ function frame(now){const dt=Math.min(.05,(now-last)/1000);last=now;const T=now/
   else if(SCR==='battle'&&BT){drawBattle(T,dt);drawParts(dt)}
   else if(SCR==='born'&&BORN){ux.clearRect(0,0,W,H);ox.clearRect(0,0,W,H);gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT);
     const r=$('stage').getBoundingClientRect(),t=texOf(BORN.c);
-    if(t&&r.bottom>0){const k=Math.min(1,(T-BORN.t0)*1.4),e=1-Math.pow(1-k,3),asp=t.w/t.h,hp=Math.min(r.height*.7,r.width*.66/asp)*e*(1+Math.sin(k*10)*.15*(1-k));
+    if(t&&r.bottom>0){const k=clamp((T-BORN.t0)*1.4,0,1),e=1-Math.pow(1-k,3),asp=t.w/t.h,hp=Math.min(r.height*.7,r.width*.66/asp)*e*(1+Math.sin(k*10)*.15*(1-k));
       const fy=r.bottom-24;ux.fillStyle='rgba(0,0,0,.35)';ux.beginPath();ux.ellipse(r.left+r.width/2,fy,hp*asp*.36,hp*asp*.07,0,0,7);ux.fill();
       const bob=BORN.c.mv==='f'||BORN.c.mv==='s'?Math.sin(T*1.6)*8-14:0;
       const fl=BORN.c.face||1;drawParts(dt);drawCre(BORN.c,r.left+r.width/2,fy+bob,hp,{t:T,flip:fl,turn:fl*(-.3+.55*Math.sin(T*.8)),mov:.6,glow:(1-k)*.8,inf:Math.min(1,Math.max(0,(T-BORN.t0-.25)*1.6))*(1+Math.sin(Math.min(1,(T-BORN.t0-.25)*1.6)*Math.PI)*.12)})}}
@@ -1330,6 +1429,7 @@ const PL=id=>PLAYERS.find(p=>p.id===id)||{id,name:'Khách',emo:'👤'};
 function savePl(){try{localStorage.setItem('tranhsong-players',JSON.stringify(PLAYERS));localStorage.setItem('tranhsong-curp',CURP)}catch(e){}}
 savePl();
 for(const c of CRE)if(!c.el){const im=new Image();im.onload=()=>{const cv=mk(im.width,im.height);cv.getContext('2d').drawImage(im,0,0);ensureEl(c,cv);c.elLock=1;saveCre();if(SCR==='home')renderHome()};im.src=c.img}
+for(const c of CRE)if(!c.gene&&c.img){const im=new Image();im.onload=()=>{const cv=mk(im.width,im.height);cv.getContext('2d').drawImage(im,0,0);c.gene=geneOf(cv);applyGene(c);saveCre();if(SCR==='home')renderHome()};im.src=c.img}
 for(const c of CRE)if(!c.faceAuto){const im=new Image();im.onload=()=>{const cv=mk(im.width,im.height);cv.getContext('2d').drawImage(im,0,0);c.face=faceFromTex(cv);c.faceAuto=1;saveCre()};im.src=c.img}
 function renderPlayers(){const me=PL(CURP),l=$('plList');l.innerHTML='';
   for(const p of PLAYERS){const b=document.createElement('button');b.className='plr'+(p.id===CURP?' on':'');const n=CRE.filter(c=>c.owner===p.id).length;
@@ -1347,7 +1447,7 @@ $('tabMine').onclick=()=>{GALALL=false;renderHome()};$('tabAll').onclick=()=>{GA
 const BEATS={f:'t',t:'w',w:'h',h:'s',s:'f'};
 const SIDECOL=['#7ee0c3','#ffb547'];
 let BT=null,AR={mode:'',mine:null,peer:null,conn:null};
-const lite=c=>({id:c.id,name:c.name,img:c.img,el:c.el||'tho',mv:c.mv,mv2:c.mv2||null,size:c.size,face:c.face||1,stats:c.stats,lines:(c.lines||[]).slice(0,8),vi:c.vi,owner:c.owner,spc:spcOf(c)});
+const lite=c=>({evo:c.evo||0,id:c.id,name:c.name,img:c.img,el:c.el||'tho',mv:c.mv,mv2:c.mv2||null,size:c.size,face:c.face||1,stats:c.stats,lines:(c.lines||[]).slice(0,8),vi:c.vi,owner:c.owner,spc:spcOf(c)});
 function fighter(c,who){const st=c.stats;const max=30+st.sucManh*4+(c.size==='t'?10:c.size==='n'?-5:0);c.spc=spcOf(c);return{c,who,hp:max,max,guard:false,soft:false,sp:1,shield:false,stun:false,burn:0,chill:0}}
 function advOf(a,b){return elMult(a.c.el,b.c.el)}
 function resolve(B,side,k){const me=B.f[side],op=B.f[1-side],S2=me.c.stats,r=Math.random,tm=elTrait(me.c),to=elTrait(op.c);
@@ -1483,7 +1583,7 @@ function autoAct(B,f,o,k){const s=f.c.stats,i=B.f.indexOf(f);
     else if(sp.hu==='hoimau'){const h=10+Math.round(s.deThuong*1.6);f.hp=Math.min(f.max,f.hp+h);autoEv(B,{t:'heal',i,h})}
     else{f.shield=true}}}
 // tung tuyệt kỹ hệ trên sàn tự đấu
-function tkPow(f,tk){const s=f.c.stats;return(10+Math.max(s.sucManh,s.phepThuat)*1.7)*(tk.p||1)*rnd(.9,1.1)}
+function tkPow(f,tk){const s=f.c.stats;return(10+Math.max(s.sucManh,s.phepThuat)*1.7)*(tk.p||1)*(1+.15*(f.c.evo||0))*rnd(.9,1.1)}
 function autoTk(B,f,o,tk){const i=B.f.indexOf(f),P=tkPow(f,tk),d=Math.hypot(o.u-f.u,o.v-f.v),ic=f.c.spc.ic,a=tk.a;
   const hit=(m,x)=>autoHit(B,f,o,'sp',m,Object.assign({r:tk.r,pierce:tk.pierce,ic},x||{}));
   if(a==='beam'){autoEv(B,{t:'vfx',k:'beam',i,ic});if(d<2.6)hit(P);else autoEv(B,{t:'hit',a:i,k:'sp',miss:1,dmg:0})}
