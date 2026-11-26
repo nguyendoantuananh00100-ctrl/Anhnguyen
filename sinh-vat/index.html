@@ -754,6 +754,13 @@ function build3D(im,c){
   const asp=im.width/im.height,HW=asp>=1?256:Math.max(16,Math.round(256*asp)),HH=asp>=1?Math.max(16,Math.round(256/asp)):256;
   const hc=mk(HW,HH),hx=hc.getContext('2d');hx.drawImage(im,0,0,HW,HH);const hd=hx.getImageData(0,0,HW,HH).data,N=HW*HH;
   const A=new Float32Array(N);for(let i=0;i<N;i++)A[i]=hd[i*4+3]/255;
+  // cắt phần giấy trắng thừa bên ngoài nét viền (lan từ ngoài vào qua chỗ không có mực, tối đa D điểm)
+  const trim=new Uint8Array(N);{let pr=0,pg=0,pb=0,pn=0,dk=0;for(let i=0;i<N;i++)if(A[i]>.9){const R=hd[i*4],G=hd[i*4+1],B=hd[i*4+2];if(R+G+B>520){pr+=R;pg+=G;pb+=B;pn++}else if(R+G+B<380)dk++}
+    if(pn>40&&dk>30){pr/=pn;pg/=pn;pb/=pn;const ink=i=>A[i]>.3&&Math.abs(hd[i*4]-pr)+Math.abs(hd[i*4+1]-pg)+Math.abs(hd[i*4+2]-pb)>110;
+      const D=Math.max(3,Math.round(.035*Math.max(HW,HH))),dd=new Int16Array(N).fill(-1);let cur=[];
+      for(let i=0;i<N;i++)if(A[i]<=.35){dd[i]=0;cur.push(i)}
+      for(let s=1;s<=D&&cur.length;s++){const nx2=[];for(const i of cur){const x=i%HW,y=(i/HW)|0;for(const k of[x>0?i-1:-1,x<HW-1?i+1:-1,y>0?i-HW:-1,y<HH-1?i+HW:-1]){if(k<0||dd[k]>=0||ink(k))continue;dd[k]=s;nx2.push(k)}}cur=nx2}
+      for(let i=0;i<N;i++)if(dd[i]>0){trim[i]=1;A[i]=0}}}
   // đóng kín nét hở (chân vẽ 2 nét), lấp lỗ bên trong
   const M0=new Uint8Array(N);for(let i=0;i<N;i++)M0[i]=A[i]>.35?1:0;
   const r=Math.max(3,Math.round(.03*Math.max(HW,HH)));
@@ -780,7 +787,7 @@ function build3D(im,c){
   // ảnh 3D: tranh gốc đè lên nền đã lấp
   const tw=Math.min(im.width,640),th=Math.round(tw/asp),tc=mk(tw,th),tx=tc.getContext('2d');tx.drawImage(im,0,0,tw,th);
   const td=tx.getImageData(0,0,tw,th),q=td.data;
-  for(let y=0;y<th;y++)for(let x=0;x<tw;x++){const fx=(x+.5)/tw*HW-.5,fy=(y+.5)/th*HH-.5,x0=Math.max(0,Math.floor(fx)),y0=Math.max(0,Math.floor(fy)),x1=Math.min(HW-1,x0+1),y1=Math.min(HH-1,y0+1),ax=Math.min(1,Math.max(0,fx-x0)),ay=Math.min(1,Math.max(0,fy-y0));
+  for(let y=0;y<th;y++)for(let x=0;x<tw;x++){const tk=Math.min(HH-1,(y/th*HH)|0)*HW+Math.min(HW-1,(x/tw*HW)|0);if(trim[tk]){const k=(y*tw+x)*4;const R=q[k],G=q[k+1],B=q[k+2];if(R+G+B>420){q[k+3]=0;continue}}const fx=(x+.5)/tw*HW-.5,fy=(y+.5)/th*HH-.5,x0=Math.max(0,Math.floor(fx)),y0=Math.max(0,Math.floor(fy)),x1=Math.min(HW-1,x0+1),y1=Math.min(HH-1,y0+1),ax=Math.min(1,Math.max(0,fx-x0)),ay=Math.min(1,Math.max(0,fy-y0));
     const f=(fil[y0*HW+x0]*(1-ax)+fil[y0*HW+x1]*ax)*(1-ay)+(fil[y1*HW+x0]*(1-ax)+fil[y1*HW+x1]*ax)*ay;if(f<=.01)continue;
     const k=(y*tw+x)*4,a=q[k+3]/255,fa=Math.min(1,f*1.6);if(a>=fa)continue;const na=fa;
     for(let ch=0;ch<3;ch++)q[k+ch]=Math.round((q[k+ch]*a+paper[ch]*(na-a))/na);q[k+3]=Math.round(na*255)}
