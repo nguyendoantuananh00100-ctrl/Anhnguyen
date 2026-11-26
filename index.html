@@ -143,6 +143,8 @@ h1{font:400 clamp(44px,13vw,72px)/1 "Rubik Wet Paint",cursive;color:var(--goo);m
     <label>Hiệu ứng âm thanh <input type="range" id="sSv" min="0" max="100" step="5"></label>
     <label>Độ nhạy ngắm <input type="range" id="sSens" min="50" max="200" step="10"><small id="sSensV"></small></label>
     <label class="chk"><input type="checkbox" id="sVib"> Rung khi bắn và bị cắn</label>
+    <label class="chk"><input type="checkbox" id="sVoice"> Giọng đọc lời thoại</label>
+    <small class="note" id="voiceNote"></small>
     <div class="seg" role="group" aria-label="Độ khó"><span>Độ khó</span><button data-d="easy">Dễ</button><button data-d="normal">Thường</button><button data-d="hard">Khó</button></div>
     <p class="note" id="diffNote"></p>
   </div>
@@ -247,13 +249,13 @@ addEventListener('pointermove',e=>{
 addEventListener('pointerup',()=>{if(G&&S.gyro&&!$('fire').matches(':active'))G.firing=false;if(pd&&pd.m<12&&performance.now()-pd.t<350)shoot();pd=null});
 
 /* ---------- cài đặt ---------- */
-const SET={mv:80,sv:100,sens:100,vib:true,diff:'normal'};
+const SET={mv:80,sv:100,sens:100,vib:true,voice:true,diff:'normal'};
 try{Object.assign(SET,JSON.parse(localStorage.getItem('thachma-set')||'{}'))}catch(e){}
 const DIFF={easy:{spd:.8,dmg:.6,cnt:.8,ammo:1.3,name:'Dễ: quái chậm, cắn nhẹ, nhiều đạn'},normal:{spd:1,dmg:1,cnt:1,ammo:1,name:'Thường: như thiết kế ban đầu'},hard:{spd:1.2,dmg:1.4,cnt:1.25,ammo:.85,name:'Khó: quái nhanh, cắn đau, ít đạn'}};
 const DF=()=>DIFF[(G&&G.diff)||SET.diff]||DIFF.normal;
 function saveSet(){try{localStorage.setItem('thachma-set',JSON.stringify(SET))}catch(e){}applySet()}
 function applySet(){if(MUS.g)MUS.g.gain.setTargetAtTime(MUS.on?SET.mv/100:0,AC.currentTime,.1);if(sfxBus)sfxBus.gain.setTargetAtTime(SET.sv/100,AC.currentTime,.05);
-  $('sMv').value=SET.mv;$('sSv').value=SET.sv;$('sSens').value=SET.sens;$('sSensV').textContent='×'+(SET.sens/100).toFixed(1);$('sVib').checked=SET.vib;
+  $('sMv').value=SET.mv;$('sSv').value=SET.sv;$('sSens').value=SET.sens;$('sSensV').textContent='×'+(SET.sens/100).toFixed(1);$('sVib').checked=SET.vib;$('sVoice').checked=SET.voice!==false;$('voiceNote').textContent=VO.note();
   document.querySelectorAll('.seg button').forEach(b=>b.classList.toggle('on',b.dataset.d===SET.diff));$('diffNote').textContent=DIFF[SET.diff].name}
 let sfxBus=null;
 
@@ -364,6 +366,20 @@ const wake=()=>{if(AC&&AC.state!=='running')AC.resume().catch(()=>{})};
 ['pointerdown','touchstart','click'].forEach(ev=>addEventListener(ev,wake,{capture:true,passive:true}));
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)wake()});
 const vib=p=>{if(!SET.vib)return;try{navigator.vibrate&&navigator.vibrate(p)}catch(e){}};
+/* ---------- giọng đọc: dùng giọng tiếng Việt có sẵn trong máy ---------- */
+const VO={ss:window.speechSynthesis,v:null,busy:false,
+  P:{nar:{p:1,r:.95},ut:{p:.75,r:.92},na:{p:1.6,r:1.1},t:{p:.35,r:.8}},
+  pick(){if(!this.ss)return;const vs=this.ss.getVoices().filter(v=>/^vi/i.test(v.lang));this.v=vs.find(v=>/google/i.test(v.name))||vs.find(v=>v.localService)||vs[0]||null},
+  ok(){return SET.voice!==false&&this.ss&&this.v},
+  note(){if(!this.ss)return'Trình duyệt này không hỗ trợ giọng đọc.';if(!this.v)return'Máy chưa có giọng tiếng Việt. Trên Android: Cài đặt > Ngôn ngữ > Chuyển văn bản thành giọng nói, chọn Google và tải giọng Tiếng Việt.';return'Giọng: '+this.v.name},
+  duck(on){if(MUS.g&&AC)MUS.g.gain.setTargetAtTime(MUS.on?SET.mv/100*(on?.35:1):0,AC.currentTime,.15)},
+  say(who,text){if(!this.ok())return 0;const c=this.P[who]||this.P.nar,u=new SpeechSynthesisUtterance(text.replace(/[“”…]/g,' ').replace(/\s+/g,' ').trim());
+    u.voice=this.v;u.lang=this.v.lang;u.pitch=c.p;u.rate=c.r;u.volume=1;
+    u.onstart=()=>{this.busy=true;this.duck(true)};u.onend=u.onerror=()=>{this.busy=false;if(!this.ss.speaking)this.duck(false)};
+    try{this.ss.cancel();this.ss.speak(u)}catch(e){return 0}
+    return text.split(/\s+/).length/(2.6*c.r)+.8},
+  stop(){try{this.ss&&this.ss.cancel()}catch(e){}this.busy=false;this.duck(false)}};
+if(VO.ss){VO.pick();VO.ss.addEventListener&&VO.ss.addEventListener('voiceschanged',()=>VO.pick());setTimeout(()=>VO.pick(),800)}
 
 /* ---------- quái vật (thiết kế nguyên bản, vẽ bằng mã) ---------- */
 const TYPES={
@@ -864,7 +880,7 @@ function guestStep(dt){
 }
 /* ---------- cốt truyện: Đêm 1, Hẻm Đèn ---------- */
 const WHO={ut:{n:'Bà Út',c:'#ffcf3a',i:'Ú'},na:{n:'Bé Na',c:'#5ee0ff',i:'N'},t:{n:'Tin nhắn lạ · T.',c:'#ff3d7f',i:'T'}};
-const INTRO=['Hẻm Đèn, đêm 14 tháng Tám.','Bạn về đây ăn Tết Trung Thu ở nhà người quen. Điện cả hẻm vừa cúp.','Chỉ còn tiệm đèn lồng của Bà Út ở đầu hẻm là sáng.','Từ cuối hẻm, chỗ xưởng kẹo bỏ hoang 20 năm, có thứ gì hồng hồng, nhầy nhầy đang bò ra.','Bà Út dúi vào tay bạn một khẩu súng đồ chơi bắn ánh trăng. “Giữ hàng rào đèn lồng. Đừng để chúng vào hẻm.”'];
+const INTRO=['Hẻm Đèn, đêm 14 tháng Tám.','Bạn về đây ăn Tết Trung Thu ở nhà người quen. Điện cả hẻm vừa cúp.','Chỉ còn tiệm đèn lồng của Bà Út ở đầu hẻm là sáng.','Từ cuối hẻm, chỗ xưởng kẹo bỏ hoang 20 năm, có thứ gì hồng hồng, nhầy nhầy đang bò ra.','Bà Út dúi vào tay bạn một khẩu súng đồ chơi bắn ánh trăng.','Bà Út: “Giữ hàng rào đèn lồng. Đừng để chúng vào hẻm.”'];
 const MEMSETS=[
   {n:'Ngày vui ở hẻm',u:'Hẻm Đèn từng là nơi vui nhất thị trấn mỗi mùa Trung Thu, nhờ xưởng kẹo của ông Tám Đường.',m:[
     ['Mẻ thạch đầu tiên','Ông Tám cầm muôi, Bà Út còn trẻ măng, cười ngặt nghẽo vì mẻ thạch bị khét.'],
@@ -917,9 +933,9 @@ function talkTick(dt){
   while(TQ.length>1&&G&&G.t-TQ[0].born>14)TQ.shift();
   if(!TQ.length)return;const q=TQ[0];if((q.wait-=dt)>0)return;TQ.shift();
   const w=WHO[q.who];$('talkAv').textContent=w.i;$('talkAv').style.background=w.c;$('talkWho').textContent=w.n;$('talkText').textContent=q.text;
-  $('talk').classList.toggle('sms',q.who==='t');$('talk').classList.add('on');talkT=q.dur;if(q.who==='t'){sfx.sms();vib([30,40,30])}
+  $('talk').classList.toggle('sms',q.who==='t');$('talk').classList.add('on');talkT=Math.max(q.dur,VO.say(q.who,q.text));if(q.who==='t'){sfx.sms();vib([30,40,30])}
 }
-function talkClear(){TQ=[];talkT=0;$('talk').classList.remove('on')}
+function talkClear(){TQ=[];talkT=0;$('talk').classList.remove('on');VO.stop()}
 const UT_IDLE=['Đèn nhà ông Bảy vừa sáng lại kìa. Chắc là nhờ con đó.','Ráng lên, trời sắp sáng rồi… chắc vậy.','Bà pha ấm trà gừng đây. Bắn tiếp đi, bà để phần.','Mấy đốm sáng đó bay về nhà ai, nhà đó nhớ lại được một chút.','Hồi xưa đêm Rằm hẻm này đông vui lắm. Hồi xưa thôi.'];
 function storyWave(n){
   if(G.endless){if(isBoss(n))say('ut','Nó lại về rồi! Bắn quả anh đào trên đỉnh!',4,1.5);return}
@@ -945,8 +961,8 @@ function drawCore(dt){const c=G.core;if(!c)return;c.t+=dt;if(c.t>4){G.core=null;
   ctx.globalAlpha=1;const g=ctx.createRadialGradient(x,y,0,x,y,r);g.addColorStop(0,'#fff');g.addColorStop(.5,'#ff9cc8');g.addColorStop(1,'#ff3d7f00');ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,r*1.4,0,7);ctx.fill()}
 let storyI=0,storyDone=null;
 function showStory(cb){storyI=0;storyDone=cb;$('storyText').innerHTML='';$('story').hidden=false;storyStep()}
-function storyStep(){if(storyI>=INTRO.length){storyEnd();return}const sp=document.createElement('span');sp.textContent=INTRO[storyI++];$('storyText').append(sp);while($('storyText').children.length>3)$('storyText').firstChild.remove();$('storyNext').textContent=storyI>=INTRO.length?'Giữ hàng rào!':'Tiếp'}
-function storyEnd(){$('story').hidden=true;try{localStorage.setItem('thachma-intro','1')}catch(e){}const f=storyDone;storyDone=null;f&&f()}
+function storyStep(){if(storyI>=INTRO.length){storyEnd();return}const line=INTRO[storyI],sp=document.createElement('span');sp.textContent=INTRO[storyI++];line.startsWith('Bà Út:')?VO.say('ut',line.slice(6)):VO.say('nar',line);$('storyText').append(sp);while($('storyText').children.length>3)$('storyText').firstChild.remove();$('storyNext').textContent=storyI>=INTRO.length?'Giữ hàng rào!':'Tiếp'}
+function storyEnd(){VO.stop();$('story').hidden=true;try{localStorage.setItem('thachma-intro','1')}catch(e){}const f=storyDone;storyDone=null;f&&f()}
 $('storyNext').addEventListener('click',storyStep);$('storySkip').addEventListener('click',storyEnd);
 $('storyBtn').addEventListener('click',()=>showStory(null));
 $('albumBtn').addEventListener('click',album);$('albumClose').addEventListener('click',()=>{$('album').hidden=true});
@@ -991,7 +1007,7 @@ function go(){
   S.yaw0=S.gyro?S.rawYaw:null;S.tYaw=S.yaw=0;S.tPitch=S.pitch=0;
   if(NET.role==='host')bcast({t:'start',n:NET.conns.length+1});
   reset();S.mode='play';showScreen(null);
-  setTimeout(()=>{if(!S.gyro)hint('Không thấy cảm biến hướng: kéo màn hình để ngắm, chạm để bắn',4);else if(!S.cam)hint('Không mở được camera: chơi trên nền đêm',3)},1500);
+  setTimeout(()=>{if(SET.voice!==false&&VO.ss&&!VO.v)setTimeout(()=>hint('Máy chưa có giọng đọc tiếng Việt. Xem hướng dẫn trong Cài đặt',3.5),4500);if(!S.gyro)hint('Không thấy cảm biến hướng: kéo màn hình để ngắm, chạm để bắn',4);else if(!S.cam)hint('Không mở được camera: chơi trên nền đêm',3)},1500);
 }
 $('startBtn').addEventListener('click',begin);
 $('contBtn').addEventListener('click',()=>{if(NET.role!=='guest')contEndless()});
@@ -1005,7 +1021,7 @@ $('fire').addEventListener('pointerdown',e=>{e.stopPropagation();if(G)G.firing=t
 $('swap').addEventListener('pointerdown',e=>{e.stopPropagation();swapGun()});
 $('reload').addEventListener('pointerdown',e=>{e.stopPropagation();reload()});
 MUS.on=true;
-function openSet(){const inGame=S.mode==='play';$('settings').hidden=false;$('setTitle').textContent=inGame?'Tạm dừng':'Cài đặt';
+function openSet(){const inGame=S.mode==='play';if(inGame)VO.stop();$('settings').hidden=false;$('setTitle').textContent=inGame?'Tạm dừng':'Cài đặt';
   $('resumeBtn').textContent=inGame?'Tiếp tục':'Xong';$('quitBtn').hidden=!inGame;
   const team=NET.role!=='solo';S.paused=inGame&&!team;if(G)G.firing=false;
   $('setNote').textContent=inGame&&team?'Đang chơi chung nên trận vẫn tiếp diễn.':'';
@@ -1018,6 +1034,7 @@ $('resumeBtn').addEventListener('click',closeSet);
 $('quitBtn').addEventListener('click',()=>{closeSet();talkClear();if(G){G.firing=false}$('reward').hidden=true;rwT=0;netReset();S.mode='start';showScreen('start');$('bossbar').hidden=true});
 [['sMv','mv'],['sSv','sv'],['sSens','sens']].forEach(([id,k])=>$(id).addEventListener('input',e=>{SET[k]=+e.target.value;saveSet()}));
 $('sVib').addEventListener('change',e=>{SET.vib=e.target.checked;saveSet();vib(40)});
+$('sVoice').addEventListener('change',e=>{SET.voice=e.target.checked;saveSet();if(SET.voice)VO.say('ut','Bà Út đây. Nghe rõ không con?');else VO.stop()});
 document.querySelectorAll('.seg button').forEach(b=>b.addEventListener('click',()=>{SET.diff=b.dataset.d;saveSet()}));
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&S.mode==='play'&&NET.role==='solo')openSet()});
 applySet();
