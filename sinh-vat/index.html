@@ -294,6 +294,7 @@ input[type=range]{width:100%;accent-color:var(--acc)}
   <h2>Âm thanh</h2>
   <div class="tog"><span>Tiếng kêu của sinh vật</span><input type="checkbox" id="sndIn"></div>
   <div class="tog"><span>Sinh vật nói bằng giọng đọc tiếng Việt</span><input type="checkbox" id="voiceIn"></div>
+  <div class="tog"><span>Sinh vật 3D (tắt nếu máy chạy chậm)</span><input type="checkbox" id="d3In"></div>
 </div>
 
 <script>
@@ -673,24 +674,177 @@ q.x*=uSqx;q.y*=uSqy;float c=cos(uRot),s2=sin(uRot);q=vec2(q.x*c-q.y*s2,q.x*s2+q.
 vec2 p=uPos+vec2(q.x*uSize.x*uFlip,-q.y*uSize.y);gl_Position=vec4(p.x/uRes.x*2.-1.,1.-p.y/uRes.y*2.,0.,1.);vUv=a;}`;
 const FS=`precision mediump float;uniform sampler2D uTex;uniform float uAlpha,uGlow;varying vec2 vUv;
 void main(){vec4 c=texture2D(uTex,vUv);c.rgb+=uGlow*c.a*vec3(1.,.85,.5);gl_FragColor=c*uAlpha;}`;
-let PRG,U={},NIDX=0;
+let PRG,U={},NIDX=0,VB2,IB2,AL2=0;
 (function initGL(){if(!gl)return;
   const sh=(t,s)=>{const o=gl.createShader(t);gl.shaderSource(o,s);gl.compileShader(o);if(!gl.getShaderParameter(o,gl.COMPILE_STATUS))console.error(gl.getShaderInfoLog(o));return o};
   PRG=gl.createProgram();gl.attachShader(PRG,sh(gl.VERTEX_SHADER,VS));gl.attachShader(PRG,sh(gl.FRAGMENT_SHADER,FS));gl.linkProgram(PRG);gl.useProgram(PRG);
   for(const n of['uPos','uSize','uRes','uT','uMode','uFlip','uMov','uSqx','uSqy','uRot','uTex','uAlpha','uGlow','uFace','uWag'])U[n]=gl.getUniformLocation(PRG,n);
   const G=18,v=[],ix=[];for(let j=0;j<=G;j++)for(let i=0;i<=G;i++)v.push(i/G,j/G);
   for(let j=0;j<G;j++)for(let i=0;i<G;i++){const k=j*(G+1)+i;ix.push(k,k+1,k+G+1,k+1,k+G+2,k+G+1)}
-  const vb=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,vb);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(v),gl.STATIC_DRAW);
-  const ib=gl.createBuffer();gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,ib);gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,new Uint16Array(ix),gl.STATIC_DRAW);NIDX=ix.length;
-  const al=gl.getAttribLocation(PRG,'a');gl.enableVertexAttribArray(al);gl.vertexAttribPointer(al,2,gl.FLOAT,false,0,0);
+  const vb=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,vb);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(v),gl.STATIC_DRAW);VB2=vb;
+  const ib=gl.createBuffer();gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,ib);gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,new Uint16Array(ix),gl.STATIC_DRAW);NIDX=ix.length;IB2=ib;
+  const al=gl.getAttribLocation(PRG,'a');AL2=al;gl.enableVertexAttribArray(al);gl.vertexAttribPointer(al,2,gl.FLOAT,false,0,0);
   gl.enable(gl.BLEND);gl.blendFunc(gl.ONE,gl.ONE_MINUS_SRC_ALPHA);gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL,true);gl.uniform1i(U.uTex,0)})();
 const TEX=new Map();
 function texOf(c){if(!gl)return null;let t=TEX.get(c.id);if(t)return t.ready?t:null;t={ready:false};TEX.set(c.id,t);
   const im=new Image();im.onload=()=>{t.g=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,t.g);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,im);
     gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
-    t.w=im.width;t.h=im.height;t.ready=true};im.src=c.img;return null}
+    t.w=im.width;t.h=im.height;t.im=im;t.ready=true};im.src=c.img;return null}
 const MODE={w:0,f:1,s:2,t:3,h:4};
-function drawCre(d,x,y,hpx,o){const t=texOf(d);if(!t)return null;const wpx=hpx*t.w/t.h;
+/* ================= 3D: thổi phồng tranh thành sinh vật có khối ================= */
+const VS3=`attribute vec3 aP;attribute vec3 aN;attribute vec2 aUv;attribute vec4 aJ;
+uniform vec2 uPos,uRes;uniform float uH,uT,uMode,uMov,uWag,uFace,uSqx,uSqy,uRot,uBeta,uPitch,uInf,uAsp;
+varying vec2 vUv;varying vec3 vN;
+vec2 rt(vec2 v,float a){float c=cos(a),s=sin(a);return vec2(v.x*c-v.y*s,v.x*s+v.y*c);}
+void main(){vec3 p=aP;vec3 n=aN;p.z*=uInf;n.z/=max(uInf,.05);float t=uT;
+float br=sin(t*2.2)*.025;p.y*=1.+br;p.x*=1.-br*.5;
+float k=aJ.w,w=aJ.z;vec2 pv=aJ.xy;float m=min(uMov,1.6);
+if(k>.5&&k<2.5){float ph=k>1.5?3.1416:0.;float lf=10.+max(0.,uMov-1.)*9.;
+  float a=(uMode<.5?sin(t*lf+ph)*.5*m:sin(t*3.+ph)*.1)*w;p.xy=pv+rt(p.xy-pv,a);n.xy=rt(n.xy,a);}
+else if(k>2.5&&k<3.5){float a=sin(t*(7.+uWag*8.))*(.35+uWag*.5)*w;vec2 q=rt(vec2(p.x-pv.x,p.z),a);p.x=pv.x+q.x;p.z=q.y;n.xz=rt(n.xz,a);
+  p.y+=sin(t*(7.+uWag*8.)+1.5)*.025*w;}
+else if(k>3.5){float a=sin(t*1.7)*sin(t*.53)*.15*w;p.xy=pv+rt(p.xy-pv,a);}
+float u=p.x/uAsp,sd=u*uFace;
+if(sd>.2&&p.y>.3&&k<.5)p.y+=sin(t*(6.+uMov*6.))*(.008+uMov*.012)*clamp((sd-.2)/.2,0.,1.);
+if(uMode>.5&&uMode<1.5)p.y+=sin(t*(9.+uMov*5.))*.16*pow(abs(u)*2.,1.6);
+else if(uMode>1.5&&uMode<2.5)p.z+=sin(u*6.-t*6.)*.07*(.4+abs(u)*1.6);
+else if(uMode>2.5&&uMode<3.5)p.z+=sin(u*9.-t*(4.+uMov*4.))*.09;
+else if(uMode>3.5)p.x+=sin(t*5.+p.y*3.)*.02*p.y;
+p.x*=uSqx;p.y*=uSqy;p.z*=uSqx;p.xy=rt(p.xy,uRot);n.xy=rt(n.xy,uRot);
+vec2 q=rt(vec2(p.x,p.z),-uBeta);vec2 qn=rt(vec2(n.x,n.z),-uBeta);
+float cp=cos(uPitch),sp=sin(uPitch);
+float U=p.y*cp-q.y*sp,V=q.y*cp+p.y*sp;float Un=n.y*cp-qn.y*sp,Vn=qn.y*cp+n.y*sp;
+vec2 s=uPos+vec2(q.x*uH,-U*uH);
+gl_Position=vec4(s.x/uRes.x*2.-1.,1.-s.y/uRes.y*2.,clamp(-V*.3,-.99,.99),1.);vUv=aUv;vN=vec3(qn.x,Un,Vn);}`;
+const FS3=`precision mediump float;uniform sampler2D uTex;uniform float uAlpha,uGlow;uniform vec3 uAmb;varying vec2 vUv;varying vec3 vN;
+void main(){vec4 c=texture2D(uTex,vUv);if(c.a<.45)discard;vec3 col=c.rgb/c.a;vec3 n=normalize(vN);
+float d=dot(n,normalize(vec3(-.4,.75,.55)));float sh=mix(.68,.87,smoothstep(-.18,.12,d));sh=mix(sh,1.04,smoothstep(.4,.62,d));
+float rim=1.-smoothstep(.05,.42,abs(n.z));col*=sh*uAmb;col=mix(col,col*.5,rim*.5);
+col+=uGlow*vec3(1.,.85,.5);gl_FragColor=vec4(col,1.)*uAlpha;}`;
+let P3=null,U3={},A3={},AMB=[1,1,1];
+function initGL3(){if(!gl||P3)return;
+  const sh=(t,s)=>{const o=gl.createShader(t);gl.shaderSource(o,s);gl.compileShader(o);if(!gl.getShaderParameter(o,gl.COMPILE_STATUS))console.error(gl.getShaderInfoLog(o));return o};
+  P3=gl.createProgram();gl.attachShader(P3,sh(gl.VERTEX_SHADER,VS3));gl.attachShader(P3,sh(gl.FRAGMENT_SHADER,FS3));gl.linkProgram(P3);
+  if(!gl.getProgramParameter(P3,gl.LINK_STATUS)){console.error(gl.getProgramInfoLog(P3));P3=false;return}
+  for(const n of['uPos','uRes','uH','uT','uMode','uMov','uWag','uFace','uSqx','uSqy','uRot','uBeta','uPitch','uInf','uAsp','uTex','uAlpha','uGlow','uAmb'])U3[n]=gl.getUniformLocation(P3,n);
+  for(const n of['aP','aN','aUv','aJ'])A3[n]=gl.getAttribLocation(P3,n)}
+/* chamfer: khoảng cách tới ô ngoài (đơn vị ô) */
+function chamfer(inn,w,h){const D=new Float32Array(w*h),BIG=1e6;for(let i=0;i<w*h;i++)D[i]=inn[i]?BIG:0;
+  const a=1,b=1.414;
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=y*w+x;if(!D[i])continue;let v=D[i];
+    v=Math.min(v,x>0?D[i-1]+a:a,y>0?D[i-w]+a:a,x>0&&y>0?D[i-w-1]+b:b,x<w-1&&y>0?D[i-w+1]+b:b);D[i]=v}
+  for(let y=h-1;y>=0;y--)for(let x=w-1;x>=0;x--){const i=y*w+x;if(!D[i])continue;let v=D[i];
+    v=Math.min(v,x<w-1?D[i+1]+a:a,y<h-1?D[i+w]+a:a,x<w-1&&y<h-1?D[i+w+1]+b:b,x>0&&y<h-1?D[i+w-1]+b:b);D[i]=v}
+  return D}
+function build3D(im,c){
+  const asp=im.width/im.height,HW=asp>=1?256:Math.max(16,Math.round(256*asp)),HH=asp>=1?Math.max(16,Math.round(256/asp)):256;
+  const hc=mk(HW,HH),hx=hc.getContext('2d');hx.drawImage(im,0,0,HW,HH);const hd=hx.getImageData(0,0,HW,HH).data,N=HW*HH;
+  const A=new Float32Array(N);for(let i=0;i<N;i++)A[i]=hd[i*4+3]/255;
+  // đóng kín nét hở (chân vẽ 2 nét), lấp lỗ bên trong
+  const M0=new Uint8Array(N);for(let i=0;i<N;i++)M0[i]=A[i]>.35?1:0;
+  const r=Math.max(3,Math.round(.03*Math.max(HW,HH)));
+  const out=new Uint8Array(N);for(let i=0;i<N;i++)out[i]=M0[i]?0:1;const dOut=chamfer(out,HW,HH);
+  const dil=new Uint8Array(N);for(let i=0;i<N;i++)dil[i]=dOut[i]<=r?0:1;// 1 = ngoài vùng nở
+  const dIn=chamfer(dil.map(v=>1-v),HW,HH);
+  const fil=new Uint8Array(N);for(let i=0;i<N;i++)fil[i]=(dIn[i]>r||M0[i])?1:0;
+  {const seen=new Uint8Array(N),st=[];for(let x=0;x<HW;x++){st.push(x,(HH-1)*HW+x)}for(let y=0;y<HH;y++){st.push(y*HW,y*HW+HW-1)}
+    while(st.length){const i=st.pop();if(seen[i]||fil[i])continue;seen[i]=1;const x=i%HW,y=(i/HW)|0;if(x>0)st.push(i-1);if(x<HW-1)st.push(i+1);if(y>0)st.push(i-HW);if(y<HH-1)st.push(i+HW)}
+    for(let i=0;i<N;i++)if(!seen[i])fil[i]=1}
+  // độ dày nét viền ngoài: phần viền nằm phẳng như đường may, không bị kéo giãn ở thành bên
+  let band=0;{const dF=chamfer(fil,HW,HH),cnt=new Float32Array(24),drk=new Float32Array(24);
+    for(let i=0;i<N;i++){const d=Math.round(dF[i]);if(d<1||d>23)continue;cnt[d]++;const R=hd[i*4],G=hd[i*4+1],B=hd[i*4+2];if(A[i]>.5&&(R+G+B)<300)drk[d]++}
+    for(let d=1;d<24;d++){if(!cnt[d]||drk[d]/cnt[d]<.45)break;band=d}}
+  // màu giấy/thân để tô phần rỗng
+  let pr=0,pg=0,pb=0,pn=0;for(let i=0;i<N;i++)if(A[i]>.9){const R=hd[i*4],G=hd[i*4+1],B=hd[i*4+2];if(R+G+B>520){pr+=R;pg+=G;pb+=B;pn++}}
+  const paper=pn>20?[pr/pn,pg/pn,pb/pn]:[251,247,239];
+  // ảnh 3D: tranh gốc đè lên nền đã lấp
+  const tw=Math.min(im.width,640),th=Math.round(tw/asp),tc=mk(tw,th),tx=tc.getContext('2d');tx.drawImage(im,0,0,tw,th);
+  const td=tx.getImageData(0,0,tw,th),q=td.data;
+  for(let y=0;y<th;y++)for(let x=0;x<tw;x++){const fx=(x+.5)/tw*HW-.5,fy=(y+.5)/th*HH-.5,x0=Math.max(0,Math.floor(fx)),y0=Math.max(0,Math.floor(fy)),x1=Math.min(HW-1,x0+1),y1=Math.min(HH-1,y0+1),ax=Math.min(1,Math.max(0,fx-x0)),ay=Math.min(1,Math.max(0,fy-y0));
+    const f=(fil[y0*HW+x0]*(1-ax)+fil[y0*HW+x1]*ax)*(1-ay)+(fil[y1*HW+x0]*(1-ax)+fil[y1*HW+x1]*ax)*ay;if(f<=.01)continue;
+    const k=(y*tw+x)*4,a=q[k+3]/255,fa=Math.min(1,f*1.6);if(a>=fa)continue;const na=fa;
+    for(let ch=0;ch<3;ch++)q[k+ch]=Math.round((q[k+ch]*a+paper[ch]*(na-a))/na);q[k+3]=Math.round(na*255)}
+  tx.putImageData(td,0,0);
+  // lưới đỉnh
+  const S=3,nx=Math.max(4,Math.round(HW/S)),ny=Math.max(4,Math.round(HH/S)),VW=nx+1,VH=ny+1,NV=VW*VH;
+  const inn=new Uint8Array(NV),any=new Uint8Array(NV);
+  for(let j=0;j<VH;j++)for(let i=0;i<VW;i++){const cx=i*HW/nx,cy=j*HH/ny;let sm=0,cnt=0,mx=0;
+    for(let y=Math.floor(cy-2);y<cy+2;y++)for(let x=Math.floor(cx-2);x<cx+2;x++){if(x<0||y<0||x>=HW||y>=HH)continue;const k=y*HW+x;sm+=fil[k];cnt++;mx=Math.max(mx,fil[k],A[k]>.25?1:0)}
+    inn[j*VW+i]=cnt&&sm/cnt>.5?1:0;any[j*VW+i]=mx}
+  for(let i=0;i<VW;i++){inn[i]=0;inn[(VH-1)*VW+i]=0}for(let j=0;j<VH;j++){inn[j*VW]=0;inn[j*VW+VW-1]=0}
+  const dist=chamfer(inn,VW,VH);
+  // bán kính khối cầu trong (medial) để phần mảnh thành ống, phần to thành khối tròn
+  const Rm=new Float32Array(NV);
+  for(let j=0;j<VH;j++)for(let i=0;i<VW;i++){const d=dist[j*VW+i];if(!d)continue;const rr=Math.ceil(d);
+    for(let y=Math.max(0,j-rr);y<=Math.min(VH-1,j+rr);y++)for(let x=Math.max(0,i-rr);x<=Math.min(VW-1,i+rr);x++){if((x-i)*(x-i)+(y-j)*(y-j)<=d*d+.5){const k=y*VW+x;if(Rm[k]<d)Rm[k]=d}}}
+  const cell=1/ny,K3=.85;let Hh=new Float32Array(NV);
+  for(let k=0;k<NV;k++){if(!inn[k])continue;const bw=Math.min(band*nx/HW*.85,Math.max(0,Rm[k]-1)),d=Math.max(0,dist[k]-.5-bw),R=Math.max(Rm[k]-bw,d,.5);Hh[k]=R*Math.pow(Math.max(0,d*(2*R-d))/(R*R),.72)*cell*K3}
+  for(let pass=0;pass<3;pass++){const B=new Float32Array(NV);for(let j=0;j<VH;j++)for(let i=0;i<VW;i++){const k=j*VW+i;if(!inn[k])continue;let s=0,n=0;for(let y=-1;y<=1;y++)for(let x=-1;x<=1;x++){const kk=(j+y)*VW+i+x;const wt=(x||y)?1:2;s+=Hh[kk]*wt;n+=wt}B[k]=s/n}Hh=B}
+  // bộ phận: chân, đuôi, tai (vùng mảnh)
+  let Rmax=0,cmx=0,cmn=0,maxJ=0,minJ=VH;for(let k=0;k<NV;k++)if(inn[k]){Rmax=Math.max(Rmax,Rm[k]);cmx+=k%VW;cmn++;const j=(k/VW)|0;maxJ=Math.max(maxJ,j);minJ=Math.min(minJ,j)}cmx/=cmn||1;
+  const lab=new Int16Array(NV).fill(-1),parts=[];
+  if(Rmax>=3){const thin=k=>inn[k]&&Rm[k]<Rmax*.5;
+    for(let k=0;k<NV;k++){if(!thin(k)||lab[k]>=0)continue;const id=parts.length,st=[k],px=[];lab[k]=id;
+      while(st.length){const v=st.pop();px.push(v);const x=v%VW,y=(v/VW)|0;for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){const xx=x+dx,yy=y+dy;if(xx<0||yy<0||xx>=VW||yy>=VH)continue;const kk=yy*VW+xx;if(lab[kk]<0&&thin(kk)){lab[kk]=id;st.push(kk)}}}
+      let x0=1e9,x1=-1,y0=1e9,y1=-1,sx=0;for(const v of px){const x=v%VW,y=(v/VW)|0;x0=Math.min(x0,x);x1=Math.max(x1,x);y0=Math.min(y0,y);y1=Math.max(y1,y);sx+=x}
+      // điểm nối với thân
+      let jx=0,jy=0,jn=0;for(const v of px){const x=v%VW,y=(v/VW)|0;let touch=false;for(let dy=-1;dy<=1&&!touch;dy++)for(let dx=-1;dx<=1;dx++){const kk=(y+dy)*VW+x+dx;if(inn[kk]&&!thin(kk)){touch=true;break}}if(touch){jx+=x;jy+=y;jn++}}
+      parts.push({id,px,x0,x1,y0,y1,cx:sx/px.length,jn,jx:jn?jx/jn:sx/px.length,jy:jn?jy/jn:y0,kind:0})}
+    const span=maxJ-minJ,wid=Math.max(1,...parts.map(p=>p.x1-p.x0)),face=c.face||1;
+    for(const p of parts){if(p.px.length<3||!p.jn){p.kind=0;continue}const ph=p.y1-p.y0,pw=p.x1-p.x0;
+      if(p.y1>=maxJ-span*.12&&ph>=pw*.7&&p.y0>minJ+span*.3){p.kind=1;p.jy=Math.min(p.jy,p.y0+1)}
+      else if((p.cx-cmx)*face<-(VW*.12))p.kind=3;
+      else if(p.y1<minJ+span*.45)p.kind=4}
+    const legs=parts.filter(p=>p.kind===1).sort((a,b)=>a.cx-b.cx);legs.forEach((p,i)=>p.kind=i%2?2:1);
+    // nhãn lan ra các đỉnh viền ngoài để nét viền đi theo chân
+    for(let it=0;it<2;it++){const L2=lab.slice();for(let k=0;k<NV;k++){if(inn[k]||L2[k]>=0)continue;const x=k%VW,y=(k/VW)|0;for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){const xx=x+dx,yy=y+dy;if(xx<0||yy<0||xx>=VW||yy>=VH)continue;const l=L2[yy*VW+xx];if(l>=0&&parts[l].kind){lab[k]=l}}}}
+    var LEGS=legs}else var LEGS=[];
+  const legZ=Rmax*cell*K3*.45,dup=LEGS.length&&LEGS.length<=2&&c.mv==='w';
+  const v=[],ix=[],X=i=>(i/nx-.5)*asp,Y=j=>1-j/ny;
+  const partW=(k,p)=>{if(!p||!p.kind)return 0;const x=k%VW,y=(k/VW)|0,dd=Math.hypot(x-p.jx,y-p.jy),L=Math.max(2,...[[p.x0,p.y0],[p.x1,p.y1],[p.x0,p.y1],[p.x1,p.y0]].map(([a,b])=>Math.hypot(a-p.jx,b-p.jy)));const s=Math.min(1,dd/(L*.4));return s*s*(3-2*s)};
+  function addV(k,side,zsh,kindOverride){const i=k%VW,j=(k/VW)|0,p=lab[k]>=0?parts[lab[k]]:null,w=partW(k,p),kind=kindOverride!=null?kindOverride:(p?p.kind:0);
+    const h=Hh[k],hxg=((Hh[j*VW+Math.min(VW-1,i+1)]-Hh[j*VW+Math.max(0,i-1)])/(2*asp/nx)),hyg=-((Hh[Math.min(VH-1,j+1)*VW+i]-Hh[Math.max(0,j-1)*VW+i])/(2/ny));
+    const pz=p&&p.kind?X(p.jx):0,py=p&&p.kind?Y(p.jy):0;
+    v.push(X(i),Y(j),side*h+zsh*(w>0?Math.min(1,w*1.5):0),-hxg,-hyg,side,i/nx,j/ny,pz,py,w,kind);return v.length/12-1}
+  const legSh=p=>!p||(p.kind!==1&&p.kind!==2)?0:dup?legZ:(LEGS.indexOf(p)%4<2?1:-1)*legZ*.7*(LEGS.length>2?1:0);
+  for(const side of[1,-1]){const map=new Int32Array(NV).fill(-1);
+    const vi=k=>{if(map[k]<0){const p=lab[k]>=0?parts[lab[k]]:null;map[k]=addV(k,side,legSh(p))}return map[k]};
+    for(let j=0;j<ny;j++)for(let i=0;i<nx;i++){const a=j*VW+i,b=a+1,c2=a+VW,d=c2+1;if(!(any[a]||any[b]||any[c2]||any[d]))continue;
+      if(side>0)ix.push(vi(a),vi(c2),vi(b),vi(b),vi(c2),vi(d));else ix.push(vi(a),vi(b),vi(c2),vi(b),vi(d),vi(c2))}
+    if(dup)for(const p of LEGS){const m2=new Int32Array(NV).fill(-1),vk=k=>{if(m2[k]<0)m2[k]=addV(k,side,-legZ,p.kind===1?2:1);return m2[k]};
+      for(let j=0;j<ny;j++)for(let i=0;i<nx;i++){const a=j*VW+i,b=a+1,c2=a+VW,d=c2+1;if(!(any[a]||any[b]||any[c2]||any[d]))continue;
+        if(![a,b,c2,d].every(k=>lab[k]===p.id))continue;if(side>0)ix.push(vk(a),vk(c2),vk(b),vk(b),vk(c2),vk(d));else ix.push(vk(a),vk(b),vk(c2),vk(b),vk(d),vk(c2))}}}
+  if(v.length/12>65000)return null;
+  const vb=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,vb);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(v),gl.STATIC_DRAW);
+  const ib=gl.createBuffer();gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,ib);gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,new Uint16Array(ix),gl.STATIC_DRAW);
+  const g=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,g);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,tc);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+  return{vb,ib,n:ix.length,g,asp,face:c.face||1,mv:c.mv,legs:LEGS.length,tails:parts.filter(p=>p.kind===3).length,thick:Rmax*cell*K3}}
+let A3ON=false;
+function use3(on){if(on===A3ON)return;A3ON=on;
+  if(on){gl.useProgram(P3);for(const n in A3)if(A3[n]>=0)gl.enableVertexAttribArray(A3[n]);gl.enable(gl.DEPTH_TEST);gl.depthFunc(gl.LEQUAL)}
+  else{for(const n in A3)if(A3[n]>=0&&A3[n]!==AL2)gl.disableVertexAttribArray(A3[n]);gl.disable(gl.DEPTH_TEST);gl.useProgram(PRG);
+    gl.bindBuffer(gl.ARRAY_BUFFER,VB2);gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,IB2);gl.enableVertexAttribArray(AL2);gl.vertexAttribPointer(AL2,2,gl.FLOAT,false,0,0)}}
+function drawCre3(d,t,x,y,hpx,o){const m=t.m;use3(true);
+  gl.bindBuffer(gl.ARRAY_BUFFER,m.vb);gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,m.ib);
+  gl.vertexAttribPointer(A3.aP,3,gl.FLOAT,false,48,0);gl.vertexAttribPointer(A3.aN,3,gl.FLOAT,false,48,12);gl.vertexAttribPointer(A3.aUv,2,gl.FLOAT,false,48,24);gl.vertexAttribPointer(A3.aJ,4,gl.FLOAT,false,48,32);
+  gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,m.g);gl.uniform1i(U3.uTex,0);
+  const fl=Math.max(-1,Math.min(1,o.flip)),beta=Math.acos(fl)+(o.turn!=null?o.turn:-.32*fl);
+  gl.uniform2f(U3.uPos,x,y);gl.uniform2f(U3.uRes,W,H);gl.uniform1f(U3.uH,hpx);gl.uniform1f(U3.uT,o.t);gl.uniform1f(U3.uMode,MODE[o.mode||d.mv]);gl.uniform1f(U3.uMov,o.mov||0);gl.uniform1f(U3.uWag,o.wag||0);
+  gl.uniform1f(U3.uFace,d.face||1);gl.uniform1f(U3.uSqx,o.sqx||1);gl.uniform1f(U3.uSqy,o.sqy||1);gl.uniform1f(U3.uRot,o.rot||0);gl.uniform1f(U3.uBeta,beta);gl.uniform1f(U3.uPitch,o.pitch!=null?o.pitch:.22);
+  gl.uniform1f(U3.uInf,o.inf==null?1:Math.max(.02,o.inf));gl.uniform1f(U3.uAsp,m.asp);gl.uniform1f(U3.uAlpha,o.alpha==null?1:o.alpha);gl.uniform1f(U3.uGlow,o.glow||0);gl.uniform3f(U3.uAmb,AMB[0],AMB[1],AMB[2]);
+  gl.clear(gl.DEPTH_BUFFER_BIT);gl.drawElements(gl.TRIANGLES,m.n,gl.UNSIGNED_SHORT,0);
+  const wpx=hpx*(m.asp*Math.max(.45,Math.abs(Math.cos(beta)))+m.thick*2*Math.abs(Math.sin(beta)));return{x0:x-wpx/2,x1:x+wpx/2,y0:y-hpx,y1:y}}
+/* ánh sáng theo camera */
+let ambT=0;const ambC=mk(8,8),ambX=ambC.getContext('2d',{willReadFrequently:true});
+function updAmb(now){if(now-ambT<500)return;ambT=now;let tgt=[1,1,1];
+  if(stream&&stream.active&&vid.videoWidth){try{ambX.drawImage(vid,0,0,8,8);const q=ambX.getImageData(0,0,8,8).data;let r=0,g=0,b=0;for(let i=0;i<q.length;i+=4){r+=q[i];g+=q[i+1];b+=q[i+2]}r/=64*255;g/=64*255;b/=64*255;
+    const L=(r+g+b)/3,base=.72+Math.min(.4,L*.55),m=Math.max(.01,L);tgt=[r,g,b].map(v=>base*(.93+.07*Math.min(1.6,v/m)))}catch(e){}}
+  for(let i=0;i<3;i++)AMB[i]+=(tgt[i]-AMB[i])*.5}
+function mesh3(d,t){if(SET.d3===false||!t.im)return null;initGL3();if(!P3)return null;
+  if(t.m&&(t.m.face!==(d.face||1)||t.m.mv!==d.mv)){try{gl.deleteBuffer(t.m.vb);gl.deleteBuffer(t.m.ib);gl.deleteTexture(t.m.g)}catch(e){}t.m=null}
+  if(t.m===undefined||t.m===null&&!t.mFail){try{t.m=build3D(t.im,d);if(!t.m)t.mFail=1}catch(e){console.warn(e);t.m=null;t.mFail=1}}return t.m}
+function drawCre(d,x,y,hpx,o){const t=texOf(d);if(!t)return null;const m=mesh3(d,t);if(m)return drawCre3(d,t,x,y,hpx,o);use3(false);const wpx=hpx*t.w/t.h;
   gl.bindTexture(gl.TEXTURE_2D,t.g);gl.uniform2f(U.uPos,x,y);gl.uniform2f(U.uSize,wpx,hpx);gl.uniform2f(U.uRes,W,H);
   gl.uniform1f(U.uT,o.t);gl.uniform1f(U.uMode,MODE[o.mode||d.mv]);gl.uniform1f(U.uFlip,o.flip);gl.uniform1f(U.uMov,o.mov||0);gl.uniform1f(U.uFace,d.face||1);gl.uniform1f(U.uWag,o.wag||0);
   gl.uniform1f(U.uSqx,o.sqx||1);gl.uniform1f(U.uSqy,o.sqy||1);gl.uniform1f(U.uRot,o.rot||0);gl.uniform1f(U.uAlpha,o.alpha==null?1:o.alpha);gl.uniform1f(U.uGlow,o.glow||0);
@@ -906,7 +1060,9 @@ function drawRoom(T){
       else if(A.k==='stretch'){sqy=1+.22*e;sqx=1-.1*e}
       else if(A.k==='shake'){rot=Math.sin(A.t*45)*.13*(1-k);sqx=1+Math.sin(A.t*45)*.05*(1-k)}
       else if(A.k==='look'){wag=.4}}
-    l.rect=drawCre(d,p.x,p.y+by,hpx,{mode:l.cm,t:T+l.phase,flip:l.flip,mov:l.mov,wag,sqx,sqy,rot,glow:l.glow*.5+(l.born<1?(1-l.born)*.8:0),alpha:Math.min(1,l.born*3)});
+    {const vv=Math.atan2(l.x,l.z),fw=l.mov>.2&&l.hx!=null?l.hx*Math.sin(vv)+l.hz*Math.cos(vv):0;l.tilt=(l.tilt||0)+(fw*.75-(l.tilt||0))*.08}
+    const dist3=Math.hypot(l.x,l.z);
+    l.rect=drawCre(d,p.x,p.y+by,hpx,{mode:l.cm,t:T+l.phase,flip:l.flip,turn:l.flip*(l.tilt-.3),pitch:Math.atan2(EYE-yy,Math.max(.3,dist3)),inf:l.born<1?Math.min(1,l.born*1.3):1,mov:l.mov,wag,sqx,sqy,rot,glow:l.glow*.5+(l.born<1?(1-l.born)*.8:0),alpha:Math.min(1,l.born*3)});
     if(l.born<1){for(let i=0;i<2;i++)R.parts.push({x:p.x+rnd(-hpx*.6,hpx*.6),y:p.y-rnd(0,hpx),vx:rnd(-20,20),vy:rnd(-60,-20),t:0,life:.9,ch:'✨'})}
     if(l.bubble&&l.rect)bubble(ox,(l.rect.x0+l.rect.x1)/2,l.rect.y0-6,l.bubble.text,Math.min(1,l.bubble.t*3))}
 }
@@ -1035,7 +1191,7 @@ function doSnap(){const c=mk(Math.round(W*DPR),Math.round(H*DPR)),x=c.getContext
 
 /* ================= vòng lặp ================= */
 let last=performance.now();
-function frame(now){const dt=Math.min(.05,(now-last)/1000);last=now;const T=now/1000;
+function frame(now){const dt=Math.min(.05,(now-last)/1000);last=now;const T=now/1000;updAmb(now);
   S.yaw+=wrap(S.tYaw-S.yaw)*(S.gyro?.4:.5);S.pitch+=(S.tPitch-S.pitch)*(S.gyro?.4:.5);
   if(SCR==='room'){updRoom(dt);drawRoom(T);drawParts(dt);if(R.snap){R.snap=false;doSnap()}}
   else if(SCR==='battle'&&BT){drawBattle(T,dt);drawParts(dt)}
@@ -1044,7 +1200,7 @@ function frame(now){const dt=Math.min(.05,(now-last)/1000);last=now;const T=now/
     if(t&&r.bottom>0){const k=Math.min(1,(T-BORN.t0)*1.4),e=1-Math.pow(1-k,3),asp=t.w/t.h,hp=Math.min(r.height*.72,r.width*.8/asp)*e*(1+Math.sin(k*10)*.15*(1-k));
       const fy=r.bottom-24;ux.fillStyle='rgba(0,0,0,.35)';ux.beginPath();ux.ellipse(r.left+r.width/2,fy,hp*asp*.36,hp*asp*.07,0,0,7);ux.fill();
       const bob=BORN.c.mv==='f'||BORN.c.mv==='s'?Math.sin(T*1.6)*8-14:0;
-      drawCre(BORN.c,r.left+r.width/2,fy+bob,hp,{t:T,flip:BORN.c.face||1,mov:.6,glow:(1-k)*.8})}}
+      const fl=BORN.c.face||1;drawCre(BORN.c,r.left+r.width/2,fy+bob,hp,{t:T,flip:fl,turn:fl*(-.3+.55*Math.sin(T*.8)),mov:.6,glow:(1-k)*.8,inf:Math.min(1,Math.max(0,(T-BORN.t0-.25)*1.6))*(1+Math.sin(Math.min(1,(T-BORN.t0-.25)*1.6)*Math.PI)*.12)})}}
   else if(SCR!=='room'){gl&&gl.clear(gl.COLOR_BUFFER_BIT);ux.clearRect(0,0,W,H);ox.clearRect(0,0,W,H)}
   requestAnimationFrame(frame)}
 requestAnimationFrame(frame);
@@ -1243,9 +1399,9 @@ $('bAgain').onclick=()=>{if(!BT)return;if(BT.mode==='net'){if(BT.my===0)onNet({t
 $('bQuit').onclick=()=>{if(BT)BT.live=false;BT=null;netStop();show('arena')};
 
 /* ================= cài đặt ================= */
-$('goSet').onclick=()=>{$('keyIn').value=SET.key;$('workerIn').value=SET.worker;$('modelIn').value=SET.model;$('sndIn').checked=SET.sound;$('voiceIn').checked=SET.voice;$('setMsg').textContent='';show('set')};
+$('goSet').onclick=()=>{$('keyIn').value=SET.key;$('workerIn').value=SET.worker;$('modelIn').value=SET.model;$('sndIn').checked=SET.sound;$('voiceIn').checked=SET.voice;$('d3In').checked=SET.d3!==false;$('setMsg').textContent='';show('set')};
 $('setBack').onclick=()=>{saveFields();show('home')};
-function saveFields(){SET.key=$('keyIn').value.trim();SET.worker=$('workerIn').value.trim();SET.model=$('modelIn').value.trim();MODELS=null;SET.sound=$('sndIn').checked;SET.voice=$('voiceIn').checked;saveSet()}
+function saveFields(){SET.key=$('keyIn').value.trim();SET.worker=$('workerIn').value.trim();SET.model=$('modelIn').value.trim();MODELS=null;SET.sound=$('sndIn').checked;SET.voice=$('voiceIn').checked;SET.d3=$('d3In').checked;saveSet()}
 $('setTest').onclick=async()=>{saveFields();const m=$('setMsg');if(!SET.key&&!SET.worker){m.textContent='Đã lưu. Chưa gắn Gemini, game vẫn chạy bằng AI trên máy.';return}
   m.innerHTML='<span class="spin">✨</span> Đang thử…';
   const c=mk(140,140),x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,140,140);x.lineWidth=5;x.beginPath();x.ellipse(65,70,40,24,0,0,7);x.moveTo(105,70);x.lineTo(130,50);x.lineTo(130,90);x.closePath();x.stroke();
