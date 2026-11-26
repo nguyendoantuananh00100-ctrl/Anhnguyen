@@ -430,14 +430,42 @@ function drawWorld(){
     for(let d=4;d<=24;d+=4){const pts=[];for(let a=-80;a<=80;a+=5)pts.push(proj(a*D2R,d,0));polyline(pts)}
     for(let a=-75;a<=75;a+=15){const pts=[];for(let d=2;d<=30;d+=2)pts.push(proj(a*D2R,d,0));polyline(pts)}
   }
-  ctx.lineWidth=2;ctx.setLineDash([4,10]);ctx.strokeStyle='#ff3d7f55';
-  const fence=[];for(let a=-62;a<=62;a+=4)fence.push(proj(a*D2R,2.4,0));polyline(fence);
-  ctx.strokeStyle='#ff3d7f44';[-62,62].forEach(a=>{const pts=[];for(let d=2.4;d<=26;d+=2)pts.push(proj(a*D2R,d,0));polyline(pts)});
+  ctx.lineWidth=2;ctx.setLineDash([3,12]);
+  ctx.strokeStyle='#ff3d7f33';[-62,62].forEach(a=>{const pts=[];for(let d=FENCE;d<=26;d+=2)pts.push(proj(a*D2R,d,0));polyline(pts)});
   ctx.setLineDash([]);
 }
+/* chiến luỹ: cọc gỗ, thanh chắn sọc hồng trắng, đèn cảnh báo; gãy dần theo máu của đội */
+const FENCE=3;
+const hash=i=>{const x=Math.sin(i*12.9898+4.1)*43758.5453;return x-Math.floor(x)};
+function quad(a,b,c,d){ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.lineTo(c.x,c.y);ctx.lineTo(d.x,d.y);ctx.closePath();ctx.fill()}
+function drawFence(){
+  const broken=1-clamp(G.hp/100,0,1),pulse=MUS.danger?.5+.5*Math.sin(G.t*10):.35;
+  ctx.save();if(G.hurt>0)ctx.translate(Math.sin(G.t*70)*G.hurt*6,0);
+  const band=[];for(let a=-62;a<=62;a+=3)band.push(proj(a*D2R,FENCE+.2,0));
+  ctx.strokeStyle='rgba(255,61,127,'+(.18+pulse*.3)+')';ctx.lineWidth=8;ctx.shadowColor='#ff3d7f';ctx.shadowBlur=20;polyline(band);ctx.shadowBlur=0;
+  const posts=[];for(let i=0,a=-60;a<=60;a+=8,i++){const br=hash(i)<broken*.95;posts.push({a:a*D2R,br,lean:br?(hash(i+50)-.5)*.9:0,ht:br?.4+hash(i+9)*.2:.95,i})}
+  for(let k=0;k<posts.length-1;k++){const A=posts[k],B=posts[k+1];
+    [.32,.68].forEach((y,ri)=>{if(A.br&&B.br||(A.br||B.br)&&ri===1)return;
+      for(let j=0;j<4;j++){const a0=A.a+(B.a-A.a)*j/4,a1=A.a+(B.a-A.a)*(j+1)/4,dy=(A.br&&j<2||B.br&&j>1)?-.1:0;
+        const p0=proj(a0,FENCE,y+dy),p1=proj(a1,FENCE,y+dy),q0=proj(a0,FENCE,y+dy+.13),q1=proj(a1,FENCE,y+dy+.13);if(!p0||!p1||!q0||!q1)continue;
+        ctx.fillStyle=j%2?'#fff3e0':'#ff3d7f';quad(p0,p1,q1,q0);ctx.fillStyle='rgba(0,0,0,.25)';quad(p0,p1,{x:p1.x,y:p1.y-(p1.y-q1.y)*.3},{x:p0.x,y:p0.y-(p0.y-q0.y)*.3})}})}
+  for(const P of posts){const b=proj(P.a,FENCE,0);if(!b||b.x<-80||b.x>W+80)continue;const s=b.s,w=.14*s,hgt=P.ht*s;
+    ctx.save();ctx.translate(b.x,b.y);ctx.rotate(P.lean);
+    ctx.fillStyle='#3d2216';ctx.fillRect(-w/2,-hgt,w,hgt);ctx.fillStyle='#7a4a2a';ctx.fillRect(-w/2,-hgt,w*.35,hgt);
+    ctx.fillStyle='#3d2216';ctx.beginPath();
+    if(!P.br){ctx.moveTo(-w/2,-hgt);ctx.lineTo(0,-hgt-w*.9);ctx.lineTo(w/2,-hgt);ctx.fill();
+      if(P.i%2===0){const fl=.55+.45*Math.sin(G.t*(5+P.i*.7)+P.i)*(.4+pulse),r=.075*s;
+        ctx.fillStyle='#222';ctx.fillRect(-r*.5,-hgt-w*.9-r*.4,r,r*.5);
+        ctx.shadowColor=MUS.danger?'#ff3d3d':'#ffcf3a';ctx.shadowBlur=18*fl;ctx.fillStyle=MUS.danger?'#ff5a5a':'#ffcf3a';ctx.globalAlpha=.55+.45*fl;
+        ctx.beginPath();ctx.arc(0,-hgt-w*.9-r*1.2,r,0,7);ctx.fill();ctx.shadowBlur=0;ctx.globalAlpha=1}}
+    else{ctx.moveTo(-w/2,-hgt);ctx.lineTo(-w*.25,-hgt-w*.7);ctx.lineTo(0,-hgt-w*.15);ctx.lineTo(w*.25,-hgt-w*.85);ctx.lineTo(w/2,-hgt);ctx.fill()}
+    ctx.restore()}
+  ctx.restore();
+}
 function drawMonsters(t){
-  G.mons.sort((a,b)=>b.d-a.d);
+  G.mons.sort((a,b)=>b.d-a.d);let fenceDone=false;
   for(const m of G.mons){
+    if(!fenceDone&&m.d<FENCE){drawFence();fenceDone=true}
     const p=proj(m.a,m.d,0);m.box=null;if(!p)continue;
     const s=p.s;if(p.x<-s*2||p.x>W+s*2)continue;
     ctx.fillStyle='#0006';ctx.beginPath();ctx.ellipse(p.x,p.y,m.T.w*.55*s,m.T.w*.14*s,0,0,7);ctx.fill();
@@ -446,6 +474,7 @@ function drawMonsters(t){
     m.T.draw(ctx,t,m.ph,m.hit>0);ctx.restore();ctx.globalAlpha=1;
     m.box={x0:p.x-m.T.w*.5*s,x1:p.x+m.T.w*.5*s,y0:p.y-m.T.h*s,y1:p.y};
   }
+  if(!fenceDone)drawFence();
 }
 const NAMES={jelly:'Thạch Ma',sock:'Tất Nhảy',box:'Hộp Quà Cắn'};
 function target(){let best=null;const cx=W/2,cy=H/2;for(const m of G.mons){const b=m.box;if(b&&cx>b.x0&&cx<b.x1&&cy>b.y0&&cy<b.y1&&(!best||m.d<best.d))best=m}return best}
@@ -526,7 +555,7 @@ function step(dt){
     if(m.type==='sock')m.a=clamp(m.a+Math.sin(G.t*2.5+m.ph)*.35*dt,-ARC,ARC);
     nearest=Math.min(nearest,m.d);
     if((m.groan-=dt)<=0){const rel=wrap(m.a-S.yaw);sfx.groan(m.type,Math.sin(rel)*1.3,clamp(1.4-m.d/20,.15,1.2));m.groan=rnd(2,4.5)*(m.d<8?.6:1)}
-    if(m.d<=1.3){
+    if(m.d<=FENCE+.3){
       const dmg=m.type==='box'?35:m.type==='sock'?15:20;G.hp-=dmg;hurtFx(m.a);
       G.mons.splice(G.mons.indexOf(m),1);bcast({t:'hurt',a:m.a});bcast(snap());
       if(G.hp<=0){end(false);return}
@@ -541,7 +570,7 @@ function step(dt){
 function guestStep(dt){
   let nearest=99;MUS.danger=G.mons.some(m=>m.d<8);
   for(const m of G.mons){
-    m.d=Math.max(1.3,m.d-m.spd*dt);m.hit=Math.max(0,m.hit-dt);
+    m.d=Math.max(FENCE+.3,m.d-m.spd*dt);m.hit=Math.max(0,m.hit-dt);
     if(m.type==='sock')m.a=clamp(m.a+Math.sin(G.t*2.5+m.ph)*.35*dt,-ARC,ARC);
     nearest=Math.min(nearest,m.d);
     if((m.groan-=dt)<=0){const rel=wrap(m.a-S.yaw);sfx.groan(m.type,Math.sin(rel)*1.3,clamp(1.4-m.d/20,.15,1.2));m.groan=rnd(2,4.5)*(m.d<8?.6:1)}
