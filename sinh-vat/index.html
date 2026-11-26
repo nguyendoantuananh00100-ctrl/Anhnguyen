@@ -58,7 +58,7 @@ p{line-height:1.5}
 .dot.on{border-color:var(--acc)}
 /* cut */
 #cutBox{width:100%;max-width:520px;margin:0 auto;aspect-ratio:1;border-radius:16px;background:repeating-conic-gradient(#2a2335 0 25%,#221c2b 0 50%) 0 0/24px 24px;display:flex;align-items:center;justify-content:center;overflow:hidden}
-#cutCv{max-width:92%;max-height:92%}
+#cutCv{max-width:92%;max-height:92%;cursor:crosshair;touch-action:manipulation}
 input[type=range]{width:100%;accent-color:var(--acc)}
 .msg{color:var(--acc);font-size:14px;min-height:20px;margin:8px 0}
 /* born */
@@ -175,6 +175,7 @@ input[type=range]{width:100%;accent-color:var(--acc)}
 <div class="scr solid" id="cut">
   <div class="row" style="margin-bottom:12px"><button class="btn ghost" id="cutBack">‹ Chụp lại</button><span class="grow" style="text-align:center;font-weight:600">Tách nét vẽ</span><span style="width:70px"></span></div>
   <div id="cutBox"><canvas id="cutCv"></canvas></div>
+  <div class="row" style="margin-top:8px"><span class="note grow">👆 Chạm vào phần trắng thừa hoặc vết bẩn trên hình để xóa</span><button class="btn" id="cutUndo" disabled>↶ Hoàn tác</button></div>
   <div class="msg" id="cutMsg"></div>
   <div class="lab">Độ nhạy nét vẽ (kéo lên nếu nét mờ bị mất, kéo xuống nếu dính bẩn)</div>
   <input type="range" id="sens" min="0" max="100" value="50">
@@ -295,7 +296,7 @@ function toast(t,ms=2200){const e=$('toast');e.textContent=t;e.style.opacity=1;c
 /* ================= lưu trữ ================= */
 const SET={key:'',worker:'',model:'',sound:true,voice:true};
 try{Object.assign(SET,JSON.parse(localStorage.getItem('tranhsong-set')||'{}'))}catch(e){}
-if(SET.model==='gemini-2.5-flash')SET.model=''; // bản cũ sắp ngừng: để game tự chọn
+if(SET.model==='gemini-2.5-flash'||!SET.fast2){SET.model='';SET.fast2=1} // để game tự chọn lại bản nhanh nhất
 const saveSet=()=>{try{localStorage.setItem('tranhsong-set',JSON.stringify(SET))}catch(e){}};
 let CRE=[],ROOM=[];
 try{CRE=JSON.parse(localStorage.getItem('tranhsong-cre')||'[]')}catch(e){}
@@ -421,23 +422,45 @@ function extract(src,sens,fill){
   for(const cp of comps)if(keep[cp.id]&&cp!==big){if(cp.x1<big.x0-mx||cp.x0>big.x1+mx||cp.y1<big.y0-mx||cp.y0>big.y1+mx)keep[cp.id]=0}
   for(let i=0;i<N;i++)ink[i]=lab[i]&&keep[lab[i]]?1:0;
   let bb={x0:w,y0:h,x1:0,y1:0};for(const cp of comps)if(keep[cp.id]){bb.x0=Math.min(bb.x0,cp.x0);bb.y0=Math.min(bb.y0,cp.y0);bb.x1=Math.max(bb.x1,cp.x1);bb.y1=Math.max(bb.y1,cp.y1)}
-  // bóng thân: nối nét gần nhau rồi lấp kín bên trong
-  const r=Math.max(2,Math.round(Math.max(bb.x1-bb.x0,bb.y1-bb.y0)*.014));
+  // bóng thân: nối nét gần nhau bằng nét tròn (không còn góc vuông) rồi lấp kín bên trong
+  const r=Math.max(2,Math.round(Math.max(bb.x1-bb.x0,bb.y1-bb.y0)*.011));
   let sil;
-  if(fill){const dl=dilate(ink,w,h,r),out=new Uint8Array(N),q=new Int32Array(N);let qh=0,qt=0;
-    const push=i=>{if(!dl[i]&&!out[i]){out[i]=1;q[qt++]=i}};
+  if(fill){const di=distTo(ink,w,h),out=new Uint8Array(N),q=new Int32Array(N);let qh=0,qt=0;
+    const push=i=>{if(di[i]>r&&!out[i]){out[i]=1;q[qt++]=i}};
     for(let xx=0;xx<w;xx++){push(xx);push((h-1)*w+xx)}for(let y=0;y<h;y++){push(y*w);push(y*w+w-1)}
     while(qh<qt){const j=q[qh++],xx=j%w,y=(j/w)|0;if(xx>0)push(j-1);if(xx<w-1)push(j+1);if(y>0)push(j-w);if(y<h-1)push(j+w)}
-    sil=new Uint8Array(N);for(let i=0;i<N;i++)sil[i]=out[i]?0:1;sil=erode(sil,w,h,r);for(let i=0;i<N;i++)if(ink[i])sil[i]=1}
+    const dO=distTo(out,w,h);sil=new Uint8Array(N);for(let i=0;i<N;i++)sil[i]=(ink[i]||(!out[i]&&dO[i]>r))?1:0;
+    // bỏ mảng giấy thừa bị "bắc cầu" (khe giữa các chân, khe giữa đầu và thân): mảng hẹp chạm ra ngoài
+    const fo=new Uint8Array(N);for(let i=0;i<N;i++)fo[i]=sil[i]&&!ink[i]?1:0;
+    const nf=new Uint8Array(N);for(let i=0;i<N;i++)nf[i]=fo[i]?0:1;const dIn=distTo(nf,w,h);
+    const C=components(fo,w,h),mxD=new Float32Array(C.comps.length+1),touch=new Uint8Array(C.comps.length+1);
+    for(let i=0;i<N;i++){const id=C.lab[i];if(!id)continue;if(dIn[i]>mxD[id])mxD[id]=dIn[i];const xx=i%w,y=(i/w)|0;
+      if((xx>0&&!sil[i-1])||(xx<w-1&&!sil[i+1])||(y>0&&!sil[i-w])||(y<h-1&&!sil[i+w]))touch[id]=1}
+    for(let i=0;i<N;i++){const id=C.lab[i];if(id&&touch[id]&&mxD[id]<r*2.6)sil[i]=0}}
   else sil=dilate(ink,w,h,1);
-  let sb={x0:w,y0:h,x1:0,y1:0};for(let y=0;y<h;y++)for(let xx=0;xx<w;xx++)if(sil[y*w+xx]){if(xx<sb.x0)sb.x0=xx;if(xx>sb.x1)sb.x1=xx;if(y<sb.y0)sb.y0=y;if(y>sb.y1)sb.y1=y}
+  return finishCut({w,h,N,d,bR,bG,bB,ink,sil,undo:[]})
+}
+/* khoảng cách tới điểm gần nhất của mặt nạ (gần đúng Euclid, 2 lượt) */
+function distTo(m,w,h){const D=new Float32Array(w*h),S2=1.4142;
+  for(let i=0;i<w*h;i++)D[i]=m[i]?0:1e9;
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=y*w+x;let v=D[i];if(!v)continue;
+    if(x>0)v=Math.min(v,D[i-1]+1);if(y>0){v=Math.min(v,D[i-w]+1);if(x>0)v=Math.min(v,D[i-w-1]+S2);if(x<w-1)v=Math.min(v,D[i-w+1]+S2)}D[i]=v}
+  for(let y=h-1;y>=0;y--)for(let x=w-1;x>=0;x--){const i=y*w+x;let v=D[i];if(!v)continue;
+    if(x<w-1)v=Math.min(v,D[i+1]+1);if(y<h-1){v=Math.min(v,D[i+w]+1);if(x<w-1)v=Math.min(v,D[i+w+1]+S2);if(x>0)v=Math.min(v,D[i+w-1]+S2)}D[i]=v}
+  return D}
+/* dựng ảnh sinh vật từ mặt nạ (gọi lại mỗi khi người chơi chạm xóa phần thừa) */
+function finishCut(st){const{w,h,d,bR,bG,bB,ink,sil}=st;
+  let bb={x0:w,y0:h,x1:-1,y1:-1},sb={x0:w,y0:h,x1:-1,y1:-1};
+  for(let y=0;y<h;y++)for(let xx=0;xx<w;xx++){const i=y*w+xx;if(sil[i]){if(xx<sb.x0)sb.x0=xx;if(xx>sb.x1)sb.x1=xx;if(y<sb.y0)sb.y0=y;if(y>sb.y1)sb.y1=y}
+    if(ink[i]){if(xx<bb.x0)bb.x0=xx;if(xx>bb.x1)bb.x1=xx;if(y<bb.y0)bb.y0=y;if(y>bb.y1)bb.y1=y}}
+  if(bb.x1<0||sb.x1<0)return{ok:false,why:'Không còn nét vẽ nào. Bấm Hoàn tác hoặc chụp lại nhé.',st};
   const P=3;sb.x0=Math.max(0,sb.x0-P);sb.y0=Math.max(0,sb.y0-P);sb.x1=Math.min(w-1,sb.x1+P);sb.y1=Math.min(h-1,sb.y1+P);
   const tw=sb.x1-sb.x0+1,th=sb.y1-sb.y0+1;
-  if(tw<12||th<12)return{ok:false,why:'Hình vẽ quá nhỏ. Chụp gần hơn nhé.'};
+  if(tw<12||th<12)return{ok:false,why:'Hình vẽ quá nhỏ. Chụp gần hơn nhé.',st};
   const t=mk(tw,th),tx=t.getContext('2d'),od=tx.createImageData(tw,th),o=od.data;
   for(let y=0;y<th;y++)for(let xx=0;xx<tw;xx++){const i=(y+sb.y0)*w+xx+sb.x0,k=(y*tw+xx)*4;
     let a=0;for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){const X=xx+sb.x0+dx,Y=y+sb.y0+dy;if(X>=0&&Y>=0&&X<w&&Y<h)a+=sil[Y*w+X]}
-    if(!a)continue;
+    if(!a||!sil[i]&&a<5)continue;
     let R=clamp(d[i*4]/bR[i]*255,0,255),G=clamp(d[i*4+1]/bG[i]*255,0,255),B=clamp(d[i*4+2]/bB[i]*255,0,255);
     if(ink[i]){const l=.299*R+.587*G+.114*B,s=1.35;R=l+(R-l)*s;G=l+(G-l)*s;B=l+(B-l)*s;R=255*Math.pow(clamp(R,0,255)/255,1.35);G=255*Math.pow(clamp(G,0,255)/255,1.35);B=255*Math.pow(clamp(B,0,255)/255,1.35)}
     else{R=R*.3+253*.7;G=G*.3+250*.7;B=B*.3+243*.7}
@@ -445,8 +468,9 @@ function extract(src,sens,fill){
   tx.putImageData(od,0,0);
   const sc=Math.min(1,512/Math.max(tw,th)),fin=mk(Math.round(tw*sc),Math.round(th*sc));fin.getContext('2d').drawImage(t,0,0,fin.width,fin.height);
   // đoán hướng mặt: mắt/mũi (mảng nét nhỏ nằm trong thân) ở phía nào thì đầu ở phía đó
-  const sw2=sb.x1-sb.x0,sh2=sb.y1-sb.y0,cx=(sb.x0+sb.x1)/2,big2=Math.max(sw2,sh2);let ex=0,en=0;
-  for(const cp of comps){if(!keep[cp.id])continue;const cw=cp.x1-cp.x0,ch2=cp.y1-cp.y0;if(Math.max(cw,ch2)>big2*.2||cp.n<3)continue;
+  const{comps}=components(ink,w,h);
+  const sw2=sb.x1-sb.x0,cx=(sb.x0+sb.x1)/2,big2=Math.max(sw2,sb.y1-sb.y0);let ex=0,en=0;
+  for(const cp of comps){const cw=cp.x1-cp.x0,ch2=cp.y1-cp.y0;if(Math.max(cw,ch2)>big2*.2||cp.n<3)continue;
     let inside=true;const X0=Math.max(0,cp.x0-3),X1=Math.min(w-1,cp.x1+3),Y0=Math.max(0,cp.y0-3),Y1=Math.min(h-1,cp.y1+3);
     for(let x2=X0;x2<=X1&&inside;x2++){if(!sil[Y0*w+x2]||!sil[Y1*w+x2])inside=false}for(let y2=Y0;y2<=Y1&&inside;y2++){if(!sil[y2*w+X0]||!sil[y2*w+X1])inside=false}
     if(inside){ex+=(cp.x0+cp.x1)/2-cx;en++}}
@@ -454,8 +478,19 @@ function extract(src,sens,fill){
   if(en&&Math.abs(ex/en)>sw2*.08)face=Math.sign(ex/en);
   else{const colH=x2=>{let n=0;for(let y=sb.y0;y<=sb.y1;y++)n+=sil[y*w+x2];return n};let L=0,Rr=0;const k=Math.max(1,Math.floor(sw2*.25));
     for(let i=0;i<k;i++){L+=colH(sb.x0+i);Rr+=colH(sb.x1-i)}if(L>Rr*1.3)face=-1;else if(Rr>L*1.3)face=1}
-  return{ok:true,tex:fin,inp:to28(ink,w,bb),face:face||1,faceSure:!!face}
+  return{ok:true,tex:fin,inp:to28(ink,w,bb),face:face||1,faceSure:!!face,st,sb,sc}
 }
+/* chạm vào hình để xóa phần thừa: mảng giấy trắng thừa hoặc một nét bẩn */
+function eraseAt(res,px,py){const st=res.st,{w,h,ink,sil}=st;
+  let x=Math.round(res.sb.x0+px/res.sc),y=Math.round(res.sb.y0+py/res.sc);if(x<0||y<0||x>=w||y>=h)return false;
+  let i=y*w+x;
+  if(!sil[i]){let best=-1,bd=1e9;for(let dy=-6;dy<=6;dy++)for(let dx=-6;dx<=6;dx++){const X=x+dx,Y=y+dy;if(X<0||Y<0||X>=w||Y>=h)continue;const j=Y*w+X;if(sil[j]&&dx*dx+dy*dy<bd){bd=dx*dx+dy*dy;best=j}}if(best<0)return false;i=best}
+  st.undo.push([ink.slice(),sil.slice()]);if(st.undo.length>12)st.undo.shift();
+  const isInk=ink[i],q=[i],seen=new Uint8Array(w*h);seen[i]=1;
+  const ok=j=>isInk?ink[j]:(sil[j]&&!ink[j]);
+  while(q.length){const j=q.pop();sil[j]=0;if(isInk)ink[j]=0;const X=j%w,Y=(j/w)|0;
+    for(const n of[X>0?j-1:-1,X<w-1?j+1:-1,Y>0?j-w:-1,Y<h-1?j+w:-1])if(n>=0&&!seen[n]&&ok(n)){seen[n]=1;q.push(n)}}
+  return true}
 
 /* đoán hướng mặt từ ảnh sinh vật đã cắt (cho sinh vật cũ chưa có) */
 function faceFromTex(cv){const w=cv.width,h=cv.height,d=cv.getContext('2d').getImageData(0,0,w,h).data,N=w*h,ink=new Uint8Array(N),sil=new Uint8Array(N);
@@ -541,19 +576,25 @@ async function askGemini(b64){
   if(SET.worker){const r=await fetch(SET.worker,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({image:b64,mime:'image/jpeg'})});
     const j=await r.json().catch(()=>({}));if(!r.ok||j.error)throw new Error(j.error||('Worker trả lỗi '+r.status));return j}
   if(!SET.key)throw new Error('Chưa gắn khóa');
-  const body={contents:[{parts:[{text:PROMPT},{inline_data:{mime_type:'image/jpeg',data:b64}}]}],generationConfig:{responseMimeType:'application/json',temperature:1}};
-  const call=m=>fetch(GBASE+'/'+encodeURIComponent(m)+':generateContent',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':SET.key},body:JSON.stringify(body)});
+  const gc={responseMimeType:'application/json',temperature:1,maxOutputTokens:800};
+  const call=async m=>{const think=SET.noThink!==m;const body={contents:[{parts:[{text:PROMPT},{inline_data:{mime_type:'image/jpeg',data:b64}}]}],generationConfig:think?{...gc,thinkingConfig:{thinkingBudget:0}}:gc};
+    const ac2=new AbortController(),to=setTimeout(()=>ac2.abort(),14000);
+    try{let r=await fetch(GBASE+'/'+encodeURIComponent(m)+':generateContent',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':SET.key},body:JSON.stringify(body),signal:ac2.signal});
+      if(r.status===400&&think){const j=await r.clone().json().catch(()=>({}));if(/think/i.test((j.error&&j.error.message)||'')){SET.noThink=m;clearTimeout(to);return call(m)}}
+      return r}catch(e){if(e.name==='AbortError')return{ok:false,status:504,json:async()=>({error:{message:'timeout'}})};throw e}finally{clearTimeout(to)}};
+  const t0=Date.now();
   // thử mô hình đang dùng; quá tải thì đợi rồi thử lại; vẫn lỗi thì tự chuyển sang mô hình Flash khác còn dùng được
   const tried=new Set();let cands=SET.model?[SET.model]:[],last=[0,''];
   for(let round=0;round<5;round++){
     if(!cands.length){cands=(await listModels()).filter(m=>!tried.has(m)).slice(0,3);if(!cands.length)break}
     const m=cands.shift();tried.add(m);
+    if(Date.now()-t0>32000)break;
     for(let a=0;a<2;a++){let r;try{r=await call(m)}catch(e){last=[-1,String(e.message||e)];break}
       const j=await r.json().catch(()=>({}));
       if(r.ok){const t=j.candidates&&j.candidates[0]&&j.candidates[0].content&&j.candidates[0].content.parts.map(p=>p.text||'').join('');
         const out=JSON.parse((t||'').replace(/^```(json)?|```$/g,''));if(m!==SET.model){SET.model=m;saveSet()}return out}
       last=[r.status,(j.error&&j.error.message)||''];
-      if(r.status===503||r.status===500){await wait(1500*(a+1));continue}
+      if((r.status===503||r.status===500)&&a===0){await wait(800);continue}
       break}
     if(last[0]===401||/API key/i.test(last[1]))break}
   throw new Error(gErr(last[0],last[1]))}
@@ -565,11 +606,12 @@ async function listModels(){if(MODELS)return MODELS;MODELS=[];
     const ver=n=>{const x=n.match(/(\d+(?:\.\d+)?)/);return x?+x[1]:0};
     MODELS=(j.models||[]).filter(m=>(m.supportedGenerationMethods||[]).includes('generateContent')).map(m=>m.name.replace(/^models\//,''))
       .filter(n=>/flash/.test(n)&&!/image|tts|live|audio|embed|thinking|exp|robot|computer|native/.test(n))
-      .sort((a,b)=>(/preview/.test(a)-/preview/.test(b))||(ver(b)-ver(a))||(/lite/.test(a)-/lite/.test(b)))}catch(e){}
+      .sort((a,b)=>(/preview/.test(a)-/preview/.test(b))||(/lite/.test(b)-/lite/.test(a))||(ver(b)-ver(a)))}catch(e){}
   return MODELS}
 function gErr(st,m){
   if(st===-1)return 'Không kết nối được tới Gemini. Kiểm tra mạng nhé.';
   if(st===429)return 'Hết lượt miễn phí tạm thời. Thử lại sau ít phút nhé.';
+  if(st===504)return 'Gemini trả lời quá lâu nên game bỏ qua. Bấm ✨ Hỏi Gemini để thử lại sau nhé.';
   if(st===503||st===500)return 'Máy chủ Gemini đang quá tải (không phải lỗi của bạn). Thử lại sau ít phút, game vẫn dùng AI trên máy.';
   if(st===401||/API key/i.test(m))return 'Khóa Gemini không đúng hoặc chưa được bật.';
   if(!st)return 'Không tìm thấy mô hình Gemini nào dùng được với khóa này.';
@@ -582,7 +624,7 @@ function applyAI(c,a){
   if(a.chiSo)for(const k of['sucManh','tocDo','deThuong','phepThuat'])if(a.chiSo[k])c.stats[k]=clamp(Math.round(a.chiSo[k]),1,10);
   if(Array.isArray(a.loiThoai)&&a.loiThoai.length)c.lines=a.loiThoai.slice(0,8).map(s=>String(s).slice(0,90));
   if(a.gioiThieu)c.intro=String(a.gioiThieu).slice(0,200);c.ai=true}
-function jpegOf(img){const s=Math.min(1,512/Math.max(img.width,img.height)),c=mk(Math.round(img.width*s)+40,Math.round(img.height*s)+40),x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.drawImage(img,20,20,c.width-40,c.height-40);return c.toDataURL('image/jpeg',.85).split(',')[1]}
+function jpegOf(img){const s=Math.min(1,384/Math.max(img.width,img.height)),c=mk(Math.round(img.width*s)+40,Math.round(img.height*s)+40),x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.drawImage(img,20,20,c.width-40,c.height-40);return c.toDataURL('image/jpeg',.85).split(',')[1]}
 
 /* ================= WebGL: vẽ sinh vật có lưới biến dạng ================= */
 const glc=$('gl'),gl=glc.getContext('webgl',{premultipliedAlpha:true,alpha:true,preserveDrawingBuffer:true});
@@ -591,9 +633,12 @@ let W=0,H=0,F=1,DPR=1;
 function resize(){DPR=Math.min(2,devicePixelRatio||1);W=innerWidth;H=innerHeight;for(const c of[glc,under,over]){c.width=W*DPR;c.height=H*DPR}
   ux.setTransform(DPR,0,0,DPR,0,0);ox.setTransform(DPR,0,0,DPR,0,0);if(gl)gl.viewport(0,0,glc.width,glc.height);F=(W/2)/Math.tan(HFOV/2)}
 addEventListener('resize',resize);resize();
-const VS=`attribute vec2 a;uniform vec2 uPos,uSize,uRes;uniform float uT,uMode,uFlip,uMov,uSqx,uSqy,uRot;varying vec2 vUv;
+const VS=`attribute vec2 a;uniform vec2 uPos,uSize,uRes;uniform float uT,uMode,uFlip,uMov,uSqx,uSqy,uRot,uFace,uWag;varying vec2 vUv;
 void main(){float u=a.x-.5,h=1.-a.y,t=uT;float br=sin(t*2.2)*.03;vec2 q=vec2(u*(1.-br*.5),h*(1.+br));
-if(uMode<.5){float s=sin(t*10.)*uMov;if(h<.33)q.x+=s*.09*(.33-h)/.33*(u<0.?1.:-1.);q.x+=sin(t*1.3)*.02*h;}
+float sd=u*uFace;
+if(sd<-.28&&uMode!=3.){float k=clamp((-sd-.28)/.22,0.,1.);q.y+=sin(t*(7.+uWag*8.))*(.035+uWag*.05)*k;q.x+=sin(t*(7.+uWag*8.)+1.5)*.015*k;}
+if(sd>.22&&h>.35){q.y+=sin(t*(6.+uMov*6.))*(.008+uMov*.012)*clamp((sd-.22)/.2,0.,1.);}
+if(uMode<.5){float lf=10.+max(0.,uMov-1.)*9.;float s=sin(t*lf)*min(uMov,1.6);if(h<.33)q.x+=s*.09*(.33-h)/.33*(u<0.?1.:-1.);q.x+=sin(t*1.3)*.02*h;}
 else if(uMode<1.5){float f=sin(t*(9.+uMov*5.));q.y+=f*.16*pow(abs(u)*2.,1.6);}
 else if(uMode<2.5){q.y+=sin(u*6.-t*6.)*.05*(.4+abs(u)*1.6);}
 else if(uMode<3.5){q.y+=sin(u*9.-t*(4.+uMov*4.))*.07;}
@@ -606,7 +651,7 @@ let PRG,U={},NIDX=0;
 (function initGL(){if(!gl)return;
   const sh=(t,s)=>{const o=gl.createShader(t);gl.shaderSource(o,s);gl.compileShader(o);if(!gl.getShaderParameter(o,gl.COMPILE_STATUS))console.error(gl.getShaderInfoLog(o));return o};
   PRG=gl.createProgram();gl.attachShader(PRG,sh(gl.VERTEX_SHADER,VS));gl.attachShader(PRG,sh(gl.FRAGMENT_SHADER,FS));gl.linkProgram(PRG);gl.useProgram(PRG);
-  for(const n of['uPos','uSize','uRes','uT','uMode','uFlip','uMov','uSqx','uSqy','uRot','uTex','uAlpha','uGlow'])U[n]=gl.getUniformLocation(PRG,n);
+  for(const n of['uPos','uSize','uRes','uT','uMode','uFlip','uMov','uSqx','uSqy','uRot','uTex','uAlpha','uGlow','uFace','uWag'])U[n]=gl.getUniformLocation(PRG,n);
   const G=18,v=[],ix=[];for(let j=0;j<=G;j++)for(let i=0;i<=G;i++)v.push(i/G,j/G);
   for(let j=0;j<G;j++)for(let i=0;i<G;i++){const k=j*(G+1)+i;ix.push(k,k+1,k+G+1,k+1,k+G+2,k+G+1)}
   const vb=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,vb);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(v),gl.STATIC_DRAW);
@@ -621,7 +666,7 @@ function texOf(c){if(!gl)return null;let t=TEX.get(c.id);if(t)return t.ready?t:n
 const MODE={w:0,f:1,s:2,t:3,h:4};
 function drawCre(d,x,y,hpx,o){const t=texOf(d);if(!t)return null;const wpx=hpx*t.w/t.h;
   gl.bindTexture(gl.TEXTURE_2D,t.g);gl.uniform2f(U.uPos,x,y);gl.uniform2f(U.uSize,wpx,hpx);gl.uniform2f(U.uRes,W,H);
-  gl.uniform1f(U.uT,o.t);gl.uniform1f(U.uMode,MODE[o.mode||d.mv]);gl.uniform1f(U.uFlip,o.flip);gl.uniform1f(U.uMov,o.mov||0);
+  gl.uniform1f(U.uT,o.t);gl.uniform1f(U.uMode,MODE[o.mode||d.mv]);gl.uniform1f(U.uFlip,o.flip);gl.uniform1f(U.uMov,o.mov||0);gl.uniform1f(U.uFace,d.face||1);gl.uniform1f(U.uWag,o.wag||0);
   gl.uniform1f(U.uSqx,o.sqx||1);gl.uniform1f(U.uSqy,o.sqy||1);gl.uniform1f(U.uRot,o.rot||0);gl.uniform1f(U.uAlpha,o.alpha==null?1:o.alpha);gl.uniform1f(U.uGlow,o.glow||0);
   gl.drawElements(gl.TRIANGLES,NIDX,gl.UNSIGNED_SHORT,0);return{x0:x-wpx/2,x1:x+wpx/2,y0:y-hpx,y1:y}}
 
@@ -675,11 +720,16 @@ $('padDone').onclick=()=>{if(!padStrokes.length){toast('Vẽ gì đó trước �
 /* ---- cắt ---- */
 let CUT=null;
 function openCut(src){CUT={src,res:null};$('sens').value=50;$('fill').checked=true;show('cut');runCut()}
-function runCut(){const r=extract(CUT.src,+$('sens').value,$('fill').checked);CUT.res=r;const cv=$('cutCv');
-  if(!r.ok){cv.width=CUT.src.width;cv.height=CUT.src.height;const x=cv.getContext('2d');x.globalAlpha=.35;x.drawImage(CUT.src,0,0);$('cutMsg').textContent=r.why;$('cutGo').disabled=true;return}
+function runCut(){showCut(extract(CUT.src,+$('sens').value,$('fill').checked))}
+function showCut(r){CUT.res=r;const cv=$('cutCv');$('cutUndo').disabled=!(r.st&&r.st.undo.length);
+  if(!r.ok){if(r.st&&r.st.undo.length){$('cutMsg').textContent=r.why;$('cutGo').disabled=true;return}cv.width=CUT.src.width;cv.height=CUT.src.height;const x=cv.getContext('2d');x.globalAlpha=.35;x.drawImage(CUT.src,0,0);$('cutMsg').textContent=r.why;$('cutGo').disabled=true;return}
   cv.width=r.tex.width;cv.height=r.tex.height;cv.getContext('2d').drawImage(r.tex,0,0);$('cutMsg').textContent='';$('cutGo').disabled=false}
 let cutT=0;$('sens').oninput=()=>{clearTimeout(cutT);cutT=setTimeout(runCut,120)};$('fill').onchange=runCut;
 $('cutBack').onclick=()=>show('home');
+$('cutCv').addEventListener('click',e=>{const r=CUT&&CUT.res;if(!r||!r.ok)return;const b=$('cutCv').getBoundingClientRect();
+  const px=(e.clientX-b.left)/b.width*r.tex.width,py=(e.clientY-b.top)/b.height*r.tex.height;
+  if(eraseAt(r,px,py)){blip(900,400,.06,'sine',.08);showCut(finishCut(r.st))}});
+$('cutUndo').onclick=()=>{const st=CUT&&CUT.res&&CUT.res.st;if(!st||!st.undo.length)return;const[a,b]=st.undo.pop();st.ink.set(a);st.sil.set(b);showCut(finishCut(st))};
 $('cutGo').onclick=async()=>{const r=CUT.res;if(!r||!r.ok)return;
   await Promise.race([netReady,new Promise(z=>setTimeout(z,4000))]);
   const g=classify(r.inp),top=g[0];
@@ -752,7 +802,8 @@ function renderRoster(){const r=$('roster');r.innerHTML='';
     b.onclick=e=>{if(e.target.classList.contains('x')){ROOM=ROOM.filter(i=>i!==l.d.id);R.live=R.live.filter(q=>q!==l);saveCre();renderRoster();return}callOver(l)};r.appendChild(b)}}
 function callOver(l){const d=1.4;l.tx=d*Math.sin(S.yaw);l.tz=d*Math.cos(S.yaw);l.state='move';l.hi=true;l.timer=0}
 function talk(l,text){l.bubble={text,t:3.2};say(l.d,text)}
-function react(l){l.vy=Math.max(l.vy,2.4);l.y=Math.max(l.y,.001);l.glow=1;SND.happy(l.d);talk(l,pick(l.d.lines));if(navigator.vibrate)try{navigator.vibrate(30)}catch(e){}
+function react(l){if(l.act&&l.act.k==='sleep'){l.act=null;l.state='idle';l.timer=1;talk(l,'Ơ… tớ đang ngủ mà!');l.vy=2;l.y=.001;l.glow=1;SND.happy(l.d);return}
+  l.act=null;if(l.state==='act')l.state='idle';l.vy=Math.max(l.vy,2.4);l.y=Math.max(l.y,.001);l.glow=1;SND.happy(l.d);talk(l,pick(l.d.lines));if(navigator.vibrate)try{navigator.vibrate(30)}catch(e){}
   for(let i=0;i<6;i++)R.parts.push({x:(l.rect.x0+l.rect.x1)/2+rnd(-30,30),y:l.rect.y0+rnd(0,30),vx:rnd(-40,40),vy:rnd(-120,-60),t:0,life:1.2,ch:pick(['💖','✨','💛'])});
   if(l.state!=='move'){l.state='idle';l.timer=1.2}}
 function proj(x,y,z){const cy=Math.cos(S.yaw),sy=Math.sin(S.yaw),lx=x*cy-z*sy,lz=x*sy+z*cy,ly=y-EYE,cp=Math.cos(S.pitch),sp=Math.sin(S.pitch);
@@ -760,7 +811,14 @@ function proj(x,y,z){const cy=Math.cos(S.yaw),sy=Math.sin(S.yaw),lx=x*cy-z*sy,lz
 function floorAt(qx,qy){const cp=Math.cos(S.pitch),sp=Math.sin(S.pitch),lx=(qx-W/2)/F,y2=-(qy-H/2)/F;
   const lz=cp-y2*sp,ly=sp+y2*cp;if(ly>=-.02)return null;const t=-EYE/ly,ax=lx*t,az=lz*t,cy=Math.cos(S.yaw),sy=Math.sin(S.yaw);
   let x=ax*cy+az*sy,z=-ax*sy+az*cy;const d=Math.hypot(x,z);if(d>4){x*=4/d;z*=4/d}return{x,z}}
-function pickTarget(l){let a,d;
+const ACTS={sleep:[3.5,6],spin:[.9,.9],dance:[2.4,3.2],stretch:[1.4,1.4],shake:[1,1],look:[2,2.6],sit:[2.5,4]};
+function startAct(l){const d=l.d,tr=(d.traits||[]).join(' ');
+  if(R.live.length>1&&Math.random()<.22){const o=pick(R.live.filter(x=>x!==l));l.chase=o;l.state='move';l.tx=o.x;l.tz=o.z;talk(l,pick(['Đuổi bắt không?','Tớ bắt cậu nè!','Chơi với tớ đi!']));return}
+  const w={sleep:/ngái ngủ|lười/.test(tr)?4:1,spin:2,dance:/hát|hiếu động|tinh nghịch/.test(tr)?4:1.5,stretch:1.5,shake:1.2,look:/tò mò|nhút nhát/.test(tr)?4:2,sit:1.5};
+  let tot=0;for(const k in w)tot+=w[k];let x=Math.random()*tot,k='look';for(const kk in w){if((x-=w[kk])<0){k=kk;break}}
+  const[a,b]=ACTS[k];l.act={k,t:0,dur:rnd(a,b),flipAt:rnd(.5,1.2)};l.state='act';
+  if(k==='sleep')talk(l,'Khò khò…');else if(k==='dance')talk(l,pick(['Nhảy nào!','La la la~']));else if(k==='stretch')talk(l,'Ưm… vươn vai nào!')}
+function pickTarget(l){let a,d;l.run=Math.random()<.25?1:0;
   if(Math.random()<.7)a=S.yaw+rnd(-.6,.6);else a=Math.atan2(l.x,l.z)+rnd(-1,1);d=rnd(1.1,2.8);
   l.tx=d*Math.sin(a);l.tz=d*Math.cos(a);l.state='move';l.cm=l.d.mv2&&Math.random()<.45?l.d.mv2:l.d.mv}
 function updRoom(dt){
@@ -769,14 +827,23 @@ function updRoom(dt){
     if(l.eat>0){l.eat-=dt;l.mov=0;continue}
     // đồ ăn
     if(R.food.length){let best=null,bd=6;for(const f of R.food){const q=Math.hypot(f.x-l.x,f.z-l.z);if(q<bd){bd=q;best=f}}if(best){l.food=best;l.tx=best.x;l.tz=best.z;l.state='move'}}
-    if(l.state==='idle'){l.mov+=(0-l.mov)*Math.min(1,dt*5);if((l.timer-=dt)<=0)pickTarget(l)}
+    if(l.act){const A=l.act;A.t+=dt;l.mov+=(0-l.mov)*Math.min(1,dt*5);
+      if(A.k==='sleep'&&(A.z=(A.z||0)-dt)<=0&&l.rect){A.z=.9;const hs=Math.sign((l.d.face||1)*(l.flip||1));R.parts.push({x:hs>0?l.rect.x1-8:l.rect.x0+8,y:l.rect.y0+10,vx:14*hs,vy:-28,t:0,life:1.8,ch:'💤'})}
+      if(A.k==='dance'&&(A.z=(A.z||0)-dt)<=0&&l.rect){A.z=.45;R.parts.push({x:(l.rect.x0+l.rect.x1)/2+rnd(-30,30),y:l.rect.y0,vx:rnd(-20,20),vy:-50,t:0,life:1.2,ch:pick(['🎵','🎶'])})}
+      if(A.k==='look'&&A.t>A.flipAt){A.flipAt=1e9;l.dir=-l.dir}
+      if(A.k==='spin'&&!A.j){A.j=1;l.vy=2.6;l.y=.001;SND.hop(d)}
+      if(A.t>=A.dur){l.act=null;l.state='idle';l.timer=rnd(.4,1.5)}continue}
+    if(l.state==='idle'){l.mov+=(0-l.mov)*Math.min(1,dt*5);if((l.timer-=dt)<=0){if(Math.random()<.42)startAct(l);else pickTarget(l)}}
     else if(l.state==='move'){const dx=l.tx-l.x,dz=l.tz-l.z,dist=Math.hypot(dx,dz);
       if(l.food&&!R.food.includes(l.food)){l.food=null;l.state='idle';l.timer=rnd(.5,1.5)}
-      else if(dist<.12){l.state='idle';l.timer=rnd(1.2,4);
+      else if(dist<.12){l.state='idle';l.timer=rnd(1.2,4);l.run=0;
         if(l.food){R.food=R.food.filter(f=>f!==l.food);l.food=null;l.eat=1.4;SND.eat(d);talk(l,pick(['Ngon quá!','Măm măm!','Thêm cái nữa đi!','Bánh quy số một!']));
           if(l.rect)for(let i=0;i<5;i++)R.parts.push({x:(l.rect.x0+l.rect.x1)/2+rnd(-20,20),y:l.rect.y0,vx:rnd(-30,30),vy:rnd(-90,-50),t:0,life:1.2,ch:'💛'})}
         if(l.hi){l.hi=false;talk(l,pick(['Cậu gọi tớ hả?','Tớ đây nè!','Có gì vui không?']));SND.happy(d)}}
-      else{l.hx=dx/dist;l.hz=dz/dist;const v=sp*(l.cm==='h'?(l.y>0?1.6:0):1);l.x+=dx/dist*v*dt;l.z+=dz/dist*v*dt;l.mov+=(1-l.mov)*Math.min(1,dt*5);
+      else{l.hx=dx/dist;l.hz=dz/dist;const run=l.run||l.chase||l.food?1.9:1,v=sp*run*(l.cm==='h'?(l.y>0?1.6:0):1);l.x+=dx/dist*v*dt;l.z+=dz/dist*v*dt;l.mov+=((run>1?1.7:1)-l.mov)*Math.min(1,dt*5);
+        if(l.chase){const o=l.chase;l.tx=o.x;l.tz=o.z;if(Math.hypot(o.x-l.x,o.z-l.z)<.35){l.chase=null;l.state='idle';l.timer=rnd(1,2);l.vy=2.4;l.y=.001;o.vy=2.4;o.y=.001;o.act=null;
+          talk(l,pick(['Bắt được rồi!','Chạm! Tới lượt cậu!','Hihi, thua nhé!']));SND.happy(d);if(l.rect)for(let i=0;i<5;i++)R.parts.push({x:(l.rect.x0+l.rect.x1)/2+rnd(-30,30),y:l.rect.y0,vx:rnd(-40,40),vy:rnd(-90,-50),t:0,life:1.2,ch:'💞'});
+          const a=Math.atan2(o.x,o.z)+rnd(-.8,.8),dd=rnd(1.3,2.6);o.tx=dd*Math.sin(a);o.tz=dd*Math.cos(a);o.state='move';o.run=1;o.act=null}}
         if(l.cm==='h'&&l.y<=0&&l.vy<=0&&l.land<=0){l.vy=2.1;l.y=.001;SND.hop(d)}}}
     if(l.y>0||l.vy>0){l.vy-=9*dt;l.y+=l.vy*dt;if(l.y<=0){l.y=0;l.vy=0;l.land=.22}}
   }
@@ -800,8 +867,17 @@ function drawRoom(T){
     let sqx=1,sqy=1,rot=0;
     if(l.land>0){const k=l.land/.22;sqx=1+.18*k;sqy=1-.2*k}else if(l.y>0){sqx=.93;sqy=1.08}
     if(l.eat>0){const k=Math.sin(l.eat*22);sqy=1-.08*k;sqx=1+.06*k}
-    if(l.cm==='w')rot=Math.sin(T*10+l.phase)*.05*l.mov;else if(l.cm==='f'||l.cm==='s')rot=-.12*l.mov*Math.sign(l.flip);
-    l.rect=drawCre(d,p.x,p.y,hpx,{mode:l.cm,t:T+l.phase,flip:l.flip,mov:l.mov,sqx,sqy,rot,glow:l.glow*.5+(l.born<1?(1-l.born)*.8:0),alpha:Math.min(1,l.born*3)});
+    if(l.cm==='w')rot=Math.sin(T*10+l.phase)*.05*Math.min(1,l.mov);else if(l.cm==='f'||l.cm==='s')rot=-.12*Math.min(1,l.mov)*Math.sign(l.flip);
+    let by=0,wag=l.mov>1.2?.6:.15;const A=l.act;
+    if(A){const k=Math.min(1,A.t/A.dur),e=Math.sin(Math.PI*k);
+      if(A.k==='sleep'){const s=Math.min(1,A.t*2,(A.dur-A.t)*2);sqy=1-.16*s+Math.sin(T*1.6)*.025*s;sqx=1+.08*s;wag=0}
+      else if(A.k==='sit'){const s=Math.min(1,A.t*3,(A.dur-A.t)*3);sqy=1-.1*s;sqx=1+.05*s;wag=.9}
+      else if(A.k==='spin')rot=k*Math.PI*2*Math.sign(l.flip||1);
+      else if(A.k==='dance'){rot=Math.sin(A.t*9)*.22;by=-Math.abs(Math.sin(A.t*9))*hpx*.08;wag=1}
+      else if(A.k==='stretch'){sqy=1+.22*e;sqx=1-.1*e}
+      else if(A.k==='shake'){rot=Math.sin(A.t*45)*.13*(1-k);sqx=1+Math.sin(A.t*45)*.05*(1-k)}
+      else if(A.k==='look'){wag=.4}}
+    l.rect=drawCre(d,p.x,p.y+by,hpx,{mode:l.cm,t:T+l.phase,flip:l.flip,mov:l.mov,wag,sqx,sqy,rot,glow:l.glow*.5+(l.born<1?(1-l.born)*.8:0),alpha:Math.min(1,l.born*3)});
     if(l.born<1){for(let i=0;i<2;i++)R.parts.push({x:p.x+rnd(-hpx*.6,hpx*.6),y:p.y-rnd(0,hpx),vx:rnd(-20,20),vy:rnd(-60,-20),t:0,life:.9,ch:'✨'})}
     if(l.bubble&&l.rect)bubble(ox,(l.rect.x0+l.rect.x1)/2,l.rect.y0-6,l.bubble.text,Math.min(1,l.bubble.t*3))}
 }
