@@ -1,0 +1,698 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#16121d">
+<title>Tranh Sống</title>
+<style>
+:root{--bg:#16121d;--panel:#231d2d;--panel2:#2d2539;--ink:#f6f0e6;--mut:#b7adc3;--acc:#ffb547;--acc2:#7ee0c3;--bad:#ff7a7a;--line:#3b3249}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overflow:hidden;overscroll-behavior:none;touch-action:manipulation}
+button{font:inherit;color:inherit;border:0;cursor:pointer}
+#cam{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;display:none;background:#000;z-index:0}
+canvas.layer{position:fixed;inset:0;width:100%;height:100%;pointer-events:none}
+#under{z-index:1}#gl{z-index:2}#over{z-index:3}
+.scr{position:fixed;inset:0;z-index:4;display:none;flex-direction:column;overflow-y:auto;padding:max(16px,env(safe-area-inset-top)) 16px max(16px,env(safe-area-inset-bottom))}
+.scr.on{display:flex}
+.solid{background:var(--bg)}
+h1{font-size:34px;margin:18px 0 4px;letter-spacing:.5px}
+h1 span{color:var(--acc)}
+h2{font-size:18px;margin:22px 0 10px;color:var(--mut);font-weight:600}
+p{line-height:1.5}
+.lead{color:var(--mut);margin:0 0 18px}
+.big{display:flex;align-items:center;gap:12px;width:100%;padding:16px 18px;border-radius:16px;background:var(--panel);margin:0 0 10px;font-size:17px;font-weight:600;text-align:left}
+.big small{display:block;font-weight:400;color:var(--mut);font-size:13px;margin-top:2px}
+.big .ic{font-size:26px;width:34px;text-align:center}
+.big.main{background:var(--acc);color:#2a1a00}
+.big.main small{color:#5a3d10}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:10px}
+.card{background:var(--panel);border-radius:14px;padding:8px;text-align:center;font-size:13px}
+.card img{width:100%;aspect-ratio:1;object-fit:contain;display:block;background:var(--panel2);border-radius:10px;margin-bottom:6px}
+.card .in{color:var(--acc2);font-size:11px}
+.foot{margin-top:auto;padding-top:22px;display:flex;justify-content:space-between;align-items:center;gap:10px;color:var(--mut);font-size:13px}
+.pill{background:var(--panel);border-radius:999px;padding:9px 14px;font-size:14px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.btn{background:var(--panel2);border-radius:12px;padding:12px 16px;font-weight:600}
+.btn.pri{background:var(--acc);color:#2a1a00}
+.btn.ghost{background:transparent;color:var(--mut)}
+.btn.bad{color:var(--bad)}
+.grow{flex:1}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{background:var(--panel2);border-radius:999px;padding:7px 12px;font-size:14px}
+.chip.on{background:var(--acc2);color:#062a20;font-weight:600}
+.lab{font-size:13px;color:var(--mut);margin:14px 0 6px}
+/* scan */
+#scan{background:transparent;padding:0}
+#guide{position:absolute;left:50%;top:44%;width:min(82vw,62vh);aspect-ratio:1;transform:translate(-50%,-50%);border-radius:18px;box-shadow:0 0 0 2000px rgba(0,0,0,.45);border:2px dashed rgba(255,255,255,.85)}
+#scanHint{position:absolute;left:16px;right:16px;top:max(18px,env(safe-area-inset-top));text-align:center;font-size:15px;text-shadow:0 1px 3px #000}
+.bar{position:absolute;left:0;right:0;bottom:0;display:flex;justify-content:space-around;align-items:center;padding:16px 16px max(22px,env(safe-area-inset-bottom))}
+#shutter{width:76px;height:76px;border-radius:50%;background:#fff;box-shadow:0 0 0 5px rgba(255,255,255,.35)}
+.round{width:54px;height:54px;border-radius:50%;background:rgba(0,0,0,.5);font-size:22px}
+#flash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:9;transition:opacity .35s}
+/* pad */
+#padWrap{position:relative;width:100%;max-width:520px;margin:0 auto;aspect-ratio:1;border-radius:16px;overflow:hidden;background:#fff;touch-action:none}
+#padCv{width:100%;height:100%;display:block;touch-action:none}
+.dot{width:32px;height:32px;border-radius:50%;border:3px solid transparent}
+.dot.on{border-color:var(--acc)}
+/* cut */
+#cutBox{width:100%;max-width:520px;margin:0 auto;aspect-ratio:1;border-radius:16px;background:repeating-conic-gradient(#2a2335 0 25%,#221c2b 0 50%) 0 0/24px 24px;display:flex;align-items:center;justify-content:center;overflow:hidden}
+#cutCv{max-width:92%;max-height:92%}
+input[type=range]{width:100%;accent-color:var(--acc)}
+.msg{color:var(--acc);font-size:14px;min-height:20px;margin:8px 0}
+/* born */
+#born{background:transparent;padding:0}
+#stage{height:42vh;min-height:240px;flex:none;background:radial-gradient(ellipse at 50% 85%,rgba(255,181,71,.18),transparent 60%)}
+#bornCard{background:var(--bg);border-radius:22px 22px 0 0;padding:16px 16px max(20px,env(safe-area-inset-bottom));flex:1}
+#nameIn{width:100%;background:transparent;border:0;border-bottom:2px solid var(--line);color:var(--ink);font-size:26px;font-weight:700;padding:4px 0;outline:none}
+#nameIn:focus{border-color:var(--acc)}
+.ai{font-size:13px;color:var(--mut);margin:8px 0}
+.ai b{color:var(--acc2)}
+.stat{display:grid;grid-template-columns:96px 1fr 22px;align-items:center;gap:8px;font-size:13px;margin:5px 0}
+.stat i{display:block;height:8px;border-radius:4px;background:var(--panel2);overflow:hidden}
+.stat i b{display:block;height:100%;background:var(--acc)}
+.intro{background:var(--panel);border-radius:12px;padding:10px 12px;font-style:italic;margin:12px 0 0}
+/* room */
+#room{background:transparent;padding:0;touch-action:none}
+.hud{position:absolute;left:0;right:0;display:flex;justify-content:space-between;align-items:center;padding:0 12px;gap:8px;pointer-events:none}
+.hud>*{pointer-events:auto}
+#hudTop{top:max(12px,env(safe-area-inset-top))}
+#hudBot{bottom:max(14px,env(safe-area-inset-bottom));flex-direction:column;align-items:stretch}
+.glass{background:rgba(20,16,28,.62);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border-radius:999px;padding:10px 14px;font-weight:600;font-size:15px}
+.glass.on{background:var(--acc);color:#2a1a00}
+#roster{display:flex;gap:8px;overflow-x:auto;padding:4px 2px 8px;scrollbar-width:none}
+#roster::-webkit-scrollbar{display:none}
+.rc{flex:none;width:56px;height:56px;border-radius:14px;background:rgba(20,16,28,.62);position:relative;padding:4px}
+.rc img{width:100%;height:100%;object-fit:contain}
+.rc .x{position:absolute;top:-6px;right:-6px;width:22px;height:22px;border-radius:50%;background:#000a;font-size:12px;line-height:22px;text-align:center}
+#roomHint{position:absolute;left:50%;top:38%;transform:translateX(-50%);text-align:center;font-size:15px;text-shadow:0 1px 4px #000;pointer-events:none;transition:opacity .6s;width:80%}
+/* settings */
+.field{width:100%;background:var(--panel);border:1px solid var(--line);color:var(--ink);border-radius:12px;padding:12px;font-size:15px;outline:none}
+.field:focus{border-color:var(--acc)}
+.note{font-size:13px;color:var(--mut);line-height:1.5}
+.note a{color:var(--acc2)}
+.tog{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--line)}
+.tog input{width:22px;height:22px;accent-color:var(--acc)}
+#toast{position:fixed;left:50%;bottom:110px;transform:translateX(-50%);background:#000c;color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;z-index:20;opacity:0;transition:opacity .3s;pointer-events:none;max-width:86vw;text-align:center}
+.spin{display:inline-block;animation:sp 1s linear infinite}@keyframes sp{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<video id="cam" playsinline muted autoplay></video>
+<canvas id="under" class="layer"></canvas>
+<canvas id="gl" class="layer"></canvas>
+<canvas id="over" class="layer"></canvas>
+<div id="flash"></div>
+<div id="toast"></div>
+<input type="file" id="file" accept="image/*" hidden>
+
+<!-- NHÀ -->
+<div class="scr solid on" id="home">
+  <h1>Tranh <span>Sống</span></h1>
+  <p class="lead">Vẽ một sinh vật lên giấy, chụp lại, và xem nó sống dậy ngay trong phòng của bạn.</p>
+  <button class="big main" id="goScan"><span class="ic">📷</span><span>Chụp tranh vẽ<small>Đặt tờ giấy trên mặt bàn sáng, chụp thẳng từ trên xuống</small></span></button>
+  <button class="big" id="goFile"><span class="ic">🖼️</span><span>Chọn ảnh có sẵn<small>Ảnh chụp bức vẽ trong máy</small></span></button>
+  <button class="big" id="goPad"><span class="ic">✏️</span><span>Vẽ ngay trên điện thoại<small>Không có giấy bút? Vẽ bằng ngón tay</small></span></button>
+  <button class="big" id="goRoom" hidden><span class="ic">🏠</span><span id="goRoomT">Vào phòng</span></button>
+  <h2 id="galT" hidden>Bộ sưu tập</h2>
+  <div class="grid" id="gal"></div>
+  <div class="foot"><span id="aiState">AI trên máy: đang tải…</span><button class="pill" id="goSet">⚙️ AI &amp; cài đặt</button></div>
+</div>
+
+<!-- QUÉT -->
+<div class="scr" id="scan">
+  <div id="guide"></div>
+  <div id="scanHint">Đặt bức vẽ vào trong khung, giữ máy song song với tờ giấy</div>
+  <div class="bar">
+    <button class="round" id="scanBack">✕</button>
+    <button id="shutter" aria-label="Chụp"></button>
+    <button class="round" id="scanFile">🖼️</button>
+  </div>
+</div>
+
+<!-- VẼ -->
+<div class="scr solid" id="pad">
+  <div class="row" style="margin-bottom:12px"><button class="btn ghost" id="padBack">‹ Về</button><span class="grow" style="text-align:center;font-weight:600">Vẽ một sinh vật</span><button class="btn ghost" id="padUndo">↶</button></div>
+  <div id="padWrap"><canvas id="padCv"></canvas></div>
+  <div class="row" style="justify-content:center;margin:14px 0" id="padCols"></div>
+  <div class="row" style="justify-content:center;gap:14px;margin-bottom:14px" id="padSizes"></div>
+  <div class="row"><button class="btn" id="padClear">Xóa hết</button><button class="btn pri grow" id="padDone">Thổi hồn ✨</button></div>
+</div>
+
+<!-- CẮT -->
+<div class="scr solid" id="cut">
+  <div class="row" style="margin-bottom:12px"><button class="btn ghost" id="cutBack">‹ Chụp lại</button><span class="grow" style="text-align:center;font-weight:600">Tách nét vẽ</span><span style="width:70px"></span></div>
+  <div id="cutBox"><canvas id="cutCv"></canvas></div>
+  <div class="msg" id="cutMsg"></div>
+  <div class="lab">Độ nhạy nét vẽ (kéo lên nếu nét mờ bị mất, kéo xuống nếu dính bẩn)</div>
+  <input type="range" id="sens" min="0" max="100" value="50">
+  <div class="tog"><span>Tô kín phần thân bên trong nét viền</span><input type="checkbox" id="fill" checked></div>
+  <div class="row" style="margin-top:16px"><button class="btn pri grow" id="cutGo">Thổi hồn ✨</button></div>
+</div>
+
+<!-- RA ĐỜI -->
+<div class="scr" id="born">
+  <div id="stage"></div>
+  <div id="bornCard">
+    <input id="nameIn" maxlength="24" aria-label="Tên sinh vật">
+    <div class="ai" id="aiLine"></div>
+    <div class="lab">Đây là con gì?</div>
+    <div class="chips" id="spChips"></div>
+    <div class="lab">Cách di chuyển</div>
+    <div class="chips" id="mvChips"></div>
+    <div class="lab">Kích cỡ</div>
+    <div class="chips" id="szChips"></div>
+    <div class="row" style="margin-top:10px"><button class="chip" id="faceBtn">↔ Quay mặt</button><button class="chip" id="aiBtn" hidden>✨ Hỏi Gemini</button></div>
+    <div class="lab" id="traitT">Tính cách</div>
+    <div id="traits" style="font-size:15px"></div>
+    <div id="stats" style="margin-top:8px"></div>
+    <div class="intro" id="intro"></div>
+    <div class="row" style="margin-top:18px"><button class="btn bad" id="bornDel" hidden>Xóa</button><button class="btn" id="bornBack">‹ Về nhà</button><button class="btn pri grow" id="bornGo">Thả vào phòng 🏠</button></div>
+  </div>
+</div>
+
+<!-- PHÒNG -->
+<div class="scr" id="room">
+  <div id="roomHint">Xoay điện thoại nhìn quanh phòng.<br>Chạm vào sinh vật để chơi với nó.</div>
+  <div class="hud" id="hudTop"><button class="glass" id="roomBack">‹ Nhà</button><button class="glass" id="snap">📸 Chụp</button></div>
+  <div class="hud" id="hudBot">
+    <div id="roster"></div>
+    <div class="row" style="justify-content:space-between"><button class="glass" id="feed">🍪 Cho ăn</button><button class="glass" id="roomAdd">＋ Thêm tranh</button></div>
+  </div>
+</div>
+
+<!-- CÀI ĐẶT -->
+<div class="scr solid" id="set">
+  <div class="row" style="margin-bottom:6px"><button class="btn ghost" id="setBack">‹ Về</button><span class="grow" style="text-align:center;font-weight:600">AI &amp; cài đặt</span><span style="width:60px"></span></div>
+  <h2>AI trên máy (miễn phí, luôn bật)</h2>
+  <p class="note" id="localNote">Đoán bức vẽ là con gì trong 345 loại, chạy ngay trên điện thoại, không gửi ảnh đi đâu.</p>
+  <h2>Gemini (miễn phí, tùy chọn)</h2>
+  <p class="note">Gắn Gemini để AI nhìn bức vẽ rồi đặt tên, tính cách, chỉ số và lời thoại riêng. Chọn <b>một</b> trong hai cách:</p>
+  <div class="lab">Cách 1: dán khóa Gemini (chỉ lưu trên máy này)</div>
+  <input class="field" id="keyIn" type="password" placeholder="AIza..." autocomplete="off">
+  <div class="lab">Cách 2: địa chỉ Cloudflare Worker (để chia sẻ link cho bạn bè)</div>
+  <input class="field" id="workerIn" type="url" placeholder="https://tranh-song.ten-ban.workers.dev" autocomplete="off">
+  <div class="lab">Tên mô hình Gemini</div>
+  <input class="field" id="modelIn" placeholder="gemini-2.5-flash" autocomplete="off">
+  <div class="row" style="margin-top:12px"><button class="btn pri" id="setTest">Lưu và kiểm tra</button><span class="note grow" id="setMsg"></span></div>
+  <p class="note">Hướng dẫn lấy khóa từng bước: <a href="https://github.com/nguyendoantuananh00100-ctrl/anhnguyen/blob/main/sinh-vat/HUONG-DAN-AI.md" target="_blank" rel="noopener">HUONG-DAN-AI.md</a>. Lưu ý: ở gói miễn phí, Google có thể dùng ảnh gửi lên để cải thiện dịch vụ.</p>
+  <h2>Âm thanh</h2>
+  <div class="tog"><span>Tiếng kêu của sinh vật</span><input type="checkbox" id="sndIn"></div>
+  <div class="tog"><span>Sinh vật nói bằng giọng đọc tiếng Việt</span><input type="checkbox" id="voiceIn"></div>
+</div>
+
+<script>
+'use strict';
+const $=id=>document.getElementById(id);
+const D2R=Math.PI/180,HFOV=60*D2R,EYE=1.45;
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v)),rnd=(a,b)=>a+Math.random()*(b-a),pick=a=>a[Math.random()*a.length|0];
+const wrap=a=>{while(a>Math.PI)a-=2*Math.PI;while(a<-Math.PI)a+=2*Math.PI;return a};
+const mk=(w,h)=>{const c=document.createElement('canvas');c.width=w;c.height=h;return c};
+function toast(t,ms=2200){const e=$('toast');e.textContent=t;e.style.opacity=1;clearTimeout(toast.h);toast.h=setTimeout(()=>e.style.opacity=0,ms)}
+
+/* ================= lưu trữ ================= */
+const SET={key:'',worker:'',model:'gemini-2.5-flash',sound:true,voice:true};
+try{Object.assign(SET,JSON.parse(localStorage.getItem('tranhsong-set')||'{}'))}catch(e){}
+const saveSet=()=>{try{localStorage.setItem('tranhsong-set',JSON.stringify(SET))}catch(e){}};
+let CRE=[],ROOM=[];
+try{CRE=JSON.parse(localStorage.getItem('tranhsong-cre')||'[]')}catch(e){}
+try{ROOM=JSON.parse(localStorage.getItem('tranhsong-room')||'[]')}catch(e){}
+function saveCre(){
+  ROOM=ROOM.filter(id=>CRE.some(c=>c.id===id));
+  for(let n=0;n<40;n++){try{localStorage.setItem('tranhsong-cre',JSON.stringify(CRE));localStorage.setItem('tranhsong-room',JSON.stringify(ROOM));return true}
+    catch(e){const old=CRE.filter(c=>!ROOM.includes(c.id));if(!old.length&&CRE.length<2)return false;const v=(old.length?old:CRE)[old.length?old.length-1:CRE.length-1];CRE=CRE.filter(c=>c!==v);toast('Bộ nhớ đầy, đã xóa tranh cũ nhất')}}
+  return false}
+
+/* ================= từ điển 345 loại ================= */
+/* m: w đi, f bay, s bơi, t trườn, h nhảy */
+const DICT={};
+('flashlight|đèn pin|h;belt|thắt lưng|t;mushroom|nấm|h;pond|ao|s;strawberry|dâu tây|h;pineapple|dứa|h;sun|mặt trời|f;cow|bò|w;ear|tai|h;bush|bụi cây|h;pliers|kìm|h;watermelon|dưa hấu|h;apple|táo|h;baseball|bóng chày|h;feather|lông vũ|f;shoe|giày|w;leaf|chiếc lá|f;lollipop|kẹo mút|h;crown|vương miện|h;ocean|đại dương|s;horse|ngựa|w;mountain|núi|w;mosquito|muỗi|f;mug|cốc|h;hospital|bệnh viện|h;saw|cưa|h;castle|lâu đài|w;angel|thiên thần|f;underwear|quần lót|h;traffic_light|đèn giao thông|h;cruise_ship|tàu du lịch|s;marker|bút dạ|h;blueberry|việt quất|h;flamingo|hồng hạc|w;face|khuôn mặt|h;hockey_stick|gậy khúc côn cầu|h;bucket|cái xô|h;campfire|lửa trại|h;asparagus|măng tây|h;skateboard|ván trượt|w;door|cánh cửa|h;suitcase|va li|w;skull|đầu lâu|h;cloud|đám mây|f;paint_can|thùng sơn|h;hockey_puck|bóng khúc côn cầu|h;steak|bít tết|h;house_plant|chậu cây|h;sleeping_bag|túi ngủ|t;bench|ghế dài|w;snowman|người tuyết|h;arm|cánh tay|t;crayon|bút sáp|h;fan|quạt|h;shovel|xẻng|h;leg|cái chân|h;washing_machine|máy giặt|h;harp|đàn hạc|h;toothbrush|bàn chải|h;tree|cái cây|w;bear|gấu|w;rake|cái cào|h;megaphone|loa|h;knee|đầu gối|h;guitar|đàn ghi-ta|h;calculator|máy tính bỏ túi|h;hurricane|cơn bão|f;grapes|chùm nho|h;paintbrush|cọ vẽ|h;couch|ghế sofa|w;nose|cái mũi|h;square|hình vuông|h;wristwatch|đồng hồ đeo tay|h;penguin|chim cánh cụt|w;bridge|cây cầu|w;octagon|hình bát giác|h;submarine|tàu ngầm|s;screwdriver|tua vít|h;rollerskates|giày trượt|w;ladder|cái thang|w;wine_bottle|cái chai|h;cake|bánh kem|h;bracelet|vòng tay|h;broom|cái chổi|h;yoga|người tập yoga|w;finger|ngón tay|h;fish|cá|s;line|đường kẻ|t;truck|xe tải|w;snake|rắn|t;bus|xe buýt|w;stitches|đường khâu|t;snorkel|ống thở|h;shorts|quần đùi|h;bowtie|nơ|f;pickup_truck|xe bán tải|w;tooth|cái răng|h;snail|ốc sên|t;foot|bàn chân|h;crab|cua|w;school_bus|xe buýt trường|w;train|tàu hỏa|w;dresser|cái tủ|w;sock|chiếc tất|h;tractor|máy cày|w;map|tấm bản đồ|f;hedgehog|nhím|w;coffee_cup|tách cà phê|h;computer|máy tính|h;matches|que diêm|h;beard|bộ râu|h;frog|ếch|h;crocodile|cá sấu|w;bathtub|bồn tắm|w;rain|mưa|f;moon|mặt trăng|f;bee|ong|f;knife|con dao|h;boomerang|bum-mơ-răng|f;lighthouse|hải đăng|h;chandelier|đèn chùm|f;jail|nhà tù|h;pool|bể bơi|s;stethoscope|ống nghe|t;frying_pan|cái chảo|h;cell_phone|điện thoại|h;binoculars|ống nhòm|h;purse|cái ví|h;lantern|đèn lồng|f;birthday_cake|bánh sinh nhật|h;clarinet|kèn clarinet|h;palm_tree|cây dừa|w;aircraft_carrier|tàu sân bay|s;vase|bình hoa|h;eraser|cục tẩy|h;shark|cá mập|s;skyscraper|nhà chọc trời|h;bicycle|xe đạp|w;sink|bồn rửa|h;teapot|ấm trà|h;circle|hình tròn|h;tornado|lốc xoáy|f;bird|chim|f;stereo|dàn loa|h;mouth|cái miệng|h;key|chìa khóa|h;hot_dog|xúc xích|t;spoon|cái thìa|h;laptop|máy tính xách tay|h;cup|cái cốc|h;bottlecap|nắp chai|h;The_Great_Wall_of_China|Vạn Lý Trường Thành|t;The_Mona_Lisa|nàng Mona Lisa|h;smiley_face|mặt cười|h;waterslide|cầu trượt nước|h;eyeglasses|cặp kính|f;ceiling_fan|quạt trần|f;lobster|tôm hùm|w;moustache|ria mép|f;carrot|cà rốt|h;garden|khu vườn|h;police_car|xe cảnh sát|w;postcard|bưu thiếp|f;necklace|vòng cổ|h;helmet|mũ bảo hiểm|h;blackberry|quả mâm xôi|h;beach|bãi biển|s;golf_club|gậy gôn|h;car|ô tô|w;panda|gấu trúc|w;alarm_clock|đồng hồ báo thức|h;t-shirt|áo phông|f;dog|chó|w;bread|bánh mì|h;wine_glass|cái ly|h;lighter|bật lửa|h;flower|bông hoa|h;bandage|băng cá nhân|h;drill|máy khoan|h;butterfly|bướm|f;swan|thiên nga|s;owl|cú mèo|f;raccoon|gấu mèo|w;squiggle|nét nguệch ngoạc|t;calendar|tờ lịch|h;giraffe|hươu cao cổ|w;elephant|voi|w;trumpet|kèn trumpet|h;rabbit|thỏ|h;trombone|kèn trombone|h;sheep|cừu|w;onion|củ hành|h;church|nhà thờ|h;flip_flops|dép tông|w;spreadsheet|bảng tính|h;pear|quả lê|h;clock|đồng hồ|h;roller_coaster|tàu lượn|t;parachute|cái dù|f;kangaroo|chuột túi|h;duck|vịt|s;remote_control|điều khiển|h;compass|la bàn|h;monkey|khỉ|h;rainbow|cầu vồng|f;tennis_racquet|cây vợt|h;lion|sư tử|w;pencil|bút chì|h;string_bean|đậu que|t;oven|lò nướng|h;star|ngôi sao|f;cat|mèo|w;pizza|bánh pizza|h;soccer_ball|quả bóng|h;syringe|ống tiêm|h;flying_saucer|đĩa bay|f;eye|con mắt|f;cookie|bánh quy|h;floor_lamp|đèn cây|h;mouse|chuột|w;toilet|bồn cầu|h;toaster|máy nướng bánh|h;The_Eiffel_Tower|tháp Eiffel|h;airplane|máy bay|f;stove|cái bếp|h;cello|đàn cello|h;stop_sign|biển dừng|h;tent|cái lều|h;diving_board|ván nhảy|h;light_bulb|bóng đèn|f;hammer|cái búa|h;scorpion|bọ cạp|w;headphones|tai nghe|h;basket|cái giỏ|h;spider|nhện|w;paper_clip|kẹp giấy|h;sweater|áo len|h;ice_cream|cây kem|h;envelope|phong bì|f;sea_turtle|rùa biển|s;donut|bánh vòng|h;hat|cái mũ|h;hourglass|đồng hồ cát|h;broccoli|súp lơ|h;jacket|áo khoác|h;backpack|ba lô|h;book|quyển sách|f;lightning|tia chớp|f;drums|cái trống|h;snowflake|bông tuyết|f;radio|cái đài|h;banana|quả chuối|h;camel|lạc đà|w;canoe|chiếc xuồng|s;toothpaste|kem đánh răng|t;chair|cái ghế|w;picture_frame|khung tranh|h;parrot|vẹt|f;sandwich|bánh kẹp|h;lipstick|thỏi son|h;pants|cái quần|w;violin|đàn vi-ô-lông|h;brain|bộ não|h;power_outlet|ổ điện|h;triangle|tam giác|h;hamburger|bánh hamburger|h;dragon|rồng|f;bulldozer|máy ủi|w;cannon|khẩu pháo|w;dolphin|cá heo|s;zebra|ngựa vằn|w;animal_migration|đàn thú|w;camouflage|rằn ri|h;scissors|cái kéo|h;basketball|bóng rổ|h;elbow|khuỷu tay|h;umbrella|cái ô|f;windmill|cối xay gió|h;table|cái bàn|w;rifle|khẩu súng|h;hexagon|lục giác|h;potato|củ khoai|h;anvil|cái đe|h;sword|thanh kiếm|h;peanut|hạt lạc|h;axe|cái rìu|h;television|ti vi|h;rhinoceros|tê giác|w;baseball_bat|gậy bóng chày|h;speedboat|xuồng máy|s;sailboat|thuyền buồm|s;zigzag|đường ngoằn ngoèo|t;garden_hose|vòi nước|t;river|dòng sông|t;house|ngôi nhà|w;pillow|cái gối|h;ant|kiến|w;tiger|hổ|w;stairs|cầu thang|h;cooler|thùng đá|h;see_saw|bập bênh|h;piano|đàn piano|w;fireplace|lò sưởi|h;popsicle|kem que|h;dumbbell|quả tạ|h;mailbox|hòm thư|h;barn|nhà kho|h;hot_tub|bồn nước nóng|h;teddy-bear|gấu bông|w;fork|cái nĩa|h;dishwasher|máy rửa bát|h;peas|đậu hà lan|h;hot_air_balloon|khinh khí cầu|f;keyboard|bàn phím|t;microwave|lò vi sóng|h;wheel|bánh xe|h;fire_hydrant|trụ cứu hỏa|h;van|xe tải nhỏ|w;camera|máy ảnh|h;whale|cá voi|s;candle|cây nến|h;octopus|bạch tuộc|s;pig|lợn|w;swing_set|xích đu|h;helicopter|trực thăng|f;saxophone|kèn saxophone|h;passport|hộ chiếu|f;bat|dơi|f;ambulance|xe cứu thương|w;diamond|kim cương|h;goatee|râu dê|h;fence|hàng rào|w;grass|bãi cỏ|h;mermaid|nàng tiên cá|s;motorbike|xe máy|w;microphone|micro|h;toe|ngón chân|h;cactus|xương rồng|h;nail|cái đinh|h;telephone|điện thoại bàn|h;hand|bàn tay|w;squirrel|sóc|h;streetlight|đèn đường|h;bed|cái giường|w;firetruck|xe cứu hỏa|w')
+.split(';').forEach(s=>{const[e,v,m]=s.split('|');DICT[e]={vi:v,m}});
+const CLASSES='flashlight,belt,mushroom,pond,strawberry,pineapple,sun,cow,ear,bush,pliers,watermelon,apple,baseball,feather,shoe,leaf,lollipop,crown,ocean,horse,mountain,mosquito,mug,hospital,saw,castle,angel,underwear,traffic_light,cruise_ship,marker,blueberry,flamingo,face,hockey_stick,bucket,campfire,asparagus,skateboard,door,suitcase,skull,cloud,paint_can,hockey_puck,steak,house_plant,sleeping_bag,bench,snowman,arm,crayon,fan,shovel,leg,washing_machine,harp,toothbrush,tree,bear,rake,megaphone,knee,guitar,calculator,hurricane,grapes,paintbrush,couch,nose,square,wristwatch,penguin,bridge,octagon,submarine,screwdriver,rollerskates,ladder,wine_bottle,cake,bracelet,broom,yoga,finger,fish,line,truck,snake,bus,stitches,snorkel,shorts,bowtie,pickup_truck,tooth,snail,foot,crab,school_bus,train,dresser,sock,tractor,map,hedgehog,coffee_cup,computer,matches,beard,frog,crocodile,bathtub,rain,moon,bee,knife,boomerang,lighthouse,chandelier,jail,pool,stethoscope,frying_pan,cell_phone,binoculars,purse,lantern,birthday_cake,clarinet,palm_tree,aircraft_carrier,vase,eraser,shark,skyscraper,bicycle,sink,teapot,circle,tornado,bird,stereo,mouth,key,hot_dog,spoon,laptop,cup,bottlecap,The_Great_Wall_of_China,The_Mona_Lisa,smiley_face,waterslide,eyeglasses,ceiling_fan,lobster,moustache,carrot,garden,police_car,postcard,necklace,helmet,blackberry,beach,golf_club,car,panda,alarm_clock,t-shirt,dog,bread,wine_glass,lighter,flower,bandage,drill,butterfly,swan,owl,raccoon,squiggle,calendar,giraffe,elephant,trumpet,rabbit,trombone,sheep,onion,church,flip_flops,spreadsheet,pear,clock,roller_coaster,parachute,kangaroo,duck,remote_control,compass,monkey,rainbow,tennis_racquet,lion,pencil,string_bean,oven,star,cat,pizza,soccer_ball,syringe,flying_saucer,eye,cookie,floor_lamp,mouse,toilet,toaster,The_Eiffel_Tower,airplane,stove,cello,stop_sign,tent,diving_board,light_bulb,hammer,scorpion,headphones,basket,spider,paper_clip,sweater,ice_cream,envelope,sea_turtle,donut,hat,hourglass,broccoli,jacket,backpack,book,lightning,drums,snowflake,radio,banana,camel,canoe,toothpaste,chair,picture_frame,parrot,sandwich,lipstick,pants,violin,brain,power_outlet,triangle,hamburger,dragon,bulldozer,cannon,dolphin,zebra,animal_migration,camouflage,scissors,basketball,elbow,umbrella,windmill,table,rifle,hexagon,potato,anvil,sword,peanut,axe,television,rhinoceros,baseball_bat,speedboat,sailboat,zigzag,garden_hose,river,house,pillow,ant,tiger,stairs,cooler,see_saw,piano,fireplace,popsicle,dumbbell,mailbox,barn,hot_tub,teddy-bear,fork,dishwasher,peas,hot_air_balloon,keyboard,microwave,wheel,fire_hydrant,van,camera,whale,candle,octopus,pig,swing_set,helicopter,saxophone,passport,bat,ambulance,diamond,goatee,fence,grass,mermaid,motorbike,microphone,toe,cactus,nail,telephone,hand,squirrel,streetlight,bed,firetruck'.split(',');
+const viOf=e=>(DICT[e]&&DICT[e].vi)||e.replace(/_/g,' ');
+const cap=s=>s.charAt(0).toUpperCase()+s.slice(1);
+
+/* ================= AI trên máy: DoodleNet (tự chạy, không cần thư viện) ================= */
+let NET=null;
+function makeNet(buf){
+  const f=new Float32Array(buf);let o=0;const take=n=>{const a=f.subarray(o,o+n);o+=n;return a};
+  const L=[];for(const c of[[1,16],[16,16],0,[16,32],[32,32],0,[32,64],[64,64],0]){if(!c){L.push(null);continue}L.push({co:c[1],k:take(9*c[0]*c[1]),b:take(c[1])})}
+  const d1={k:take(576*512),b:take(512)},d2={k:take(512*345),b:take(345)};
+  return inp=>{
+    let x=inp,h=28,w=28,c=1;
+    for(const l of L){
+      if(l){const co=l.co,y=new Float32Array(h*w*co);
+        for(let i=0;i<h;i++)for(let j=0;j<w;j++){const yo=(i*w+j)*co;for(let q=0;q<co;q++)y[yo+q]=l.b[q];
+          for(let di=0;di<3;di++){const ii=i+di-1;if(ii<0||ii>=h)continue;for(let dj=0;dj<3;dj++){const jj=j+dj-1;if(jj<0||jj>=w)continue;
+            const xo=(ii*w+jj)*c,ko=(di*3+dj)*c*co;for(let p=0;p<c;p++){const v=x[xo+p];if(!v)continue;const kk=ko+p*co;for(let q=0;q<co;q++)y[yo+q]+=v*l.k[kk+q]}}}
+          for(let q=0;q<co;q++)if(y[yo+q]<0)y[yo+q]=0}
+        x=y;c=co}
+      else{const h2=h>>1,w2=w>>1,y=new Float32Array(h2*w2*c);
+        for(let i=0;i<h2;i++)for(let j=0;j<w2;j++)for(let q=0;q<c;q++){let m=-1e9;for(let a=0;a<2;a++)for(let b=0;b<2;b++){const v=x[((2*i+a)*w+2*j+b)*c+q];if(v>m)m=v}y[(i*w2+j)*c+q]=m}
+        x=y;h=h2;w=w2}}
+    const z=new Float32Array(512);z.set(d1.b);
+    for(let p=0;p<576;p++){const v=x[p];if(!v)continue;const ko=p*512;for(let q=0;q<512;q++)z[q]+=v*d1.k[ko+q]}
+    for(let q=0;q<512;q++)z[q]=Math.tanh(z[q]);
+    const out=new Float32Array(345);out.set(d2.b);
+    for(let p=0;p<512;p++){const v=z[p],ko=p*345;for(let q=0;q<345;q++)out[q]+=v*d2.k[ko+q]}
+    let m=-1e9;for(const v of out)m=Math.max(m,v);let s=0;for(let q=0;q<345;q++){out[q]=Math.exp(out[q]-m);s+=out[q]}
+    for(let q=0;q<345;q++)out[q]/=s;return out}
+}
+const netReady=fetch('doodlenet.bin').then(r=>{if(!r.ok)throw 0;return r.arrayBuffer()}).then(b=>{NET=makeNet(b);aiState()}).catch(()=>{NET=null;aiState(true)});
+function aiState(fail){const g=SET.worker||SET.key?' · Gemini: đã gắn':' · Gemini: chưa gắn';$('aiState').textContent=(fail?'AI trên máy: lỗi tải':NET?'AI trên máy: sẵn sàng':'AI trên máy: đang tải…')+g}
+
+/* mặt nạ nét → ô 28×28 như dữ liệu Quick Draw: làm mảnh nét rồi tô lại độ dày chuẩn */
+function to28(ink,w,bb){
+  const S=112,bw=bb.x1-bb.x0+1,bh=bb.y1-bb.y0+1,side=Math.max(bw,bh)*1.12;
+  const src=mk(bw,bh),sx=src.getContext('2d'),id=sx.createImageData(bw,bh);
+  for(let y=0;y<bh;y++)for(let x=0;x<bw;x++){const k=(y*bw+x)*4,v=ink[(y+bb.y0)*w+x+bb.x0]?0:255;id.data[k]=id.data[k+1]=id.data[k+2]=v;id.data[k+3]=255}
+  sx.putImageData(id,0,0);
+  const c=mk(S,S),x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,S,S);x.imageSmoothingQuality='high';
+  const k=S/side;x.drawImage(src,(S-bw*k)/2,(S-bh*k)/2,bw*k,bh*k);
+  const d=x.getImageData(0,0,S,S).data;let m=new Uint8Array(S*S);for(let i=0;i<S*S;i++)m[i]=d[i*4]<170?1:0;
+  m=thin(m,S,S);m=dilate(m,S,S,2);
+  const out=new Float32Array(784);
+  for(let i=0;i<28;i++)for(let j=0;j<28;j++){let s=0;for(let a=0;a<4;a++)for(let b=0;b<4;b++)s+=m[(i*4+a)*S+j*4+b];out[i*28+j]=Math.min(1,s/16*1.6)}
+  return out}
+function classify(inp){if(!NET)return[];const p=NET(inp);return[...p.keys()].sort((a,b)=>p[b]-p[a]).slice(0,5).map(i=>[CLASSES[i],p[i]])}
+
+/* ================= xử lý ảnh ================= */
+function dilate(m,w,h,r){if(r<1)return m.slice();const t=new Uint8Array(w*h),o=new Uint8Array(w*h);
+  for(let y=0;y<h;y++){let c=0;const R=y*w;for(let x=-r;x<w;x++){if(x+r<w&&m[R+x+r])c++;if(x-r-1>=0&&m[R+x-r-1])c--;if(x>=0)t[R+x]=c>0?1:0}}
+  for(let x=0;x<w;x++){let c=0;for(let y=-r;y<h;y++){if(y+r<h&&t[(y+r)*w+x])c++;if(y-r-1>=0&&t[(y-r-1)*w+x])c--;if(y>=0)o[y*w+x]=c>0?1:0}}
+  return o}
+function erode(m,w,h,r){const n=new Uint8Array(w*h);for(let i=0;i<w*h;i++)n[i]=m[i]?0:1;const d=dilate(n,w,h,r);for(let i=0;i<w*h;i++)n[i]=d[i]?0:1;return n}
+function thin(m,w,h){ // Zhang–Suen
+  const a=m.slice();let ch=true,it=0;
+  while(ch&&it++<40){ch=false;for(let pass=0;pass<2;pass++){const del=[];
+    for(let y=1;y<h-1;y++)for(let x=1;x<w-1;x++){const i=y*w+x;if(!a[i])continue;
+      const p2=a[i-w],p3=a[i-w+1],p4=a[i+1],p5=a[i+w+1],p6=a[i+w],p7=a[i+w-1],p8=a[i-1],p9=a[i-w-1];
+      const B=p2+p3+p4+p5+p6+p7+p8+p9;if(B<2||B>6)continue;
+      const A=(!p2&&p3)+(!p3&&p4)+(!p4&&p5)+(!p5&&p6)+(!p6&&p7)+(!p7&&p8)+(!p8&&p9)+(!p9&&p2);if(A!==1)continue;
+      if(pass===0?(p2*p4*p6||p4*p6*p8):(p2*p4*p8||p2*p6*p8))continue;del.push(i)}
+    for(const i of del)a[i]=0;if(del.length)ch=true}}
+  return a}
+function components(m,w,h){ // nhãn 4-liền-kề
+  const lab=new Int32Array(w*h),comps=[];const st=new Int32Array(w*h);
+  for(let i=0;i<w*h;i++){if(!m[i]||lab[i])continue;const id=comps.length+1;let sp=0,n=0,border=false,x0=w,y0=h,x1=0,y1=0;st[sp++]=i;lab[i]=id;
+    while(sp){const j=st[--sp],x=j%w,y=(j/w)|0;n++;if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y;if(x===0||y===0||x===w-1||y===h-1)border=true;
+      if(x>0&&m[j-1]&&!lab[j-1]){lab[j-1]=id;st[sp++]=j-1}if(x<w-1&&m[j+1]&&!lab[j+1]){lab[j+1]=id;st[sp++]=j+1}
+      if(y>0&&m[j-w]&&!lab[j-w]){lab[j-w]=id;st[sp++]=j-w}if(y<h-1&&m[j+w]&&!lab[j+w]){lab[j+w]=id;st[sp++]=j+w}}
+    comps.push({id,n,border,x0,y0,x1,y1})}
+  return{lab,comps}}
+
+/* tách nét vẽ khỏi giấy: ước lượng màu giấy từng vùng (chống bóng đổ), nét = tối hơn giấy hoặc có màu */
+function extract(src,sens,fill){
+  const S=Math.min(1,900/Math.max(src.width,src.height)),w=Math.max(8,Math.round(src.width*S)),h=Math.max(8,Math.round(src.height*S)),N=w*h;
+  const c=mk(w,h),x=c.getContext('2d',{willReadFrequently:true});x.drawImage(src,0,0,w,h);
+  const d=x.getImageData(0,0,w,h).data,L=new Float32Array(N);
+  for(let i=0;i<N;i++)L[i]=.299*d[i*4]+.587*d[i*4+1]+.114*d[i*4+2];
+  const cs=Math.max(10,Math.round(Math.max(w,h)/22)),gw=Math.ceil(w/cs),gh=Math.ceil(h/cs);
+  const gL=new Float32Array(gw*gh),gR=new Float32Array(gw*gh),gG=new Float32Array(gw*gh),gB=new Float32Array(gw*gh);
+  for(let gy=0;gy<gh;gy++)for(let gx=0;gx<gw;gx++){const vals=[];
+    for(let y=gy*cs;y<Math.min(h,(gy+1)*cs);y+=2)for(let xx=gx*cs;xx<Math.min(w,(gx+1)*cs);xx+=2)vals.push(L[y*w+xx]);
+    vals.sort((a,b)=>a-b);const p=vals[Math.floor(vals.length*.88)]||255,lo=vals[Math.floor(vals.length*.7)]||0;
+    let r=0,g=0,b=0,n=0;for(let y=gy*cs;y<Math.min(h,(gy+1)*cs);y+=2)for(let xx=gx*cs;xx<Math.min(w,(gx+1)*cs);xx+=2){const i=y*w+xx;if(L[i]>=lo){r+=d[i*4];g+=d[i*4+1];b+=d[i*4+2];n++}}
+    const k=gy*gw+gx;gL[k]=p;gR[k]=r/n||p;gG[k]=g/n||p;gB[k]=b/n||p}
+  // ô bị nét phủ kín (tối hẳn) → lấy theo ô hàng xóm
+  const med=[...gL].sort((a,b)=>a-b)[gL.length>>1];
+  for(let rep=0;rep<6;rep++)for(let k=0;k<gw*gh;k++){if(gL[k]>=med*.8)continue;const gx=k%gw,gy=(k/gw)|0;let s=0,r=0,g=0,b=0,n=0;
+    for(let a=-1;a<=1;a++)for(let bb=-1;bb<=1;bb++){const X=gx+a,Y=gy+bb;if(X<0||Y<0||X>=gw||Y>=gh)continue;const q=Y*gw+X;if(gL[q]<med*.8)continue;s+=gL[q];r+=gR[q];g+=gG[q];b+=gB[q];n++}
+    if(n){gL[k]=s/n;gR[k]=r/n;gG[k]=g/n;gB[k]=b/n}}
+  const bgAt=(xx,y,arr)=>{const fx=clamp(xx/cs-.5,0,gw-1),fy=clamp(y/cs-.5,0,gh-1),x0=fx|0,y0=fy|0,x1=Math.min(gw-1,x0+1),y1=Math.min(gh-1,y0+1),tx=fx-x0,ty=fy-y0;
+    return(arr[y0*gw+x0]*(1-tx)+arr[y0*gw+x1]*tx)*(1-ty)+(arr[y1*gw+x0]*(1-tx)+arr[y1*gw+x1]*tx)*ty};
+  const bL=new Float32Array(N),bR=new Float32Array(N),bG=new Float32Array(N),bB=new Float32Array(N),ink=new Uint8Array(N);
+  const tD=.32-sens*.0024,tC=.3-sens*.002;
+  for(let y=0;y<h;y++)for(let xx=0;xx<w;xx++){const i=y*w+xx;bL[i]=Math.max(30,bgAt(xx,y,gL));bR[i]=Math.max(30,bgAt(xx,y,gR));bG[i]=Math.max(30,bgAt(xx,y,gG));bB[i]=Math.max(30,bgAt(xx,y,gB));
+    const r=d[i*4],g=d[i*4+1],b=d[i*4+2],dark=1-L[i]/bL[i];
+    const ch=(Math.max(r,g,b)-Math.min(r,g,b))-(Math.max(bR[i],bG[i],bB[i])-Math.min(bR[i],bG[i],bB[i]));
+    ink[i]=(dark>tD||ch/255>tC)?1:0}
+  // bỏ chấm bẩn và mảng dính mép ảnh (mép giấy, mặt bàn)
+  let {lab,comps}=components(ink,w,h);const minA=Math.max(6,N*.00012);
+  const keep=new Uint8Array(comps.length+1);let kept=0;
+  for(const cp of comps){if(cp.n<minA||cp.border)continue;keep[cp.id]=1;kept+=cp.n}
+  if(!kept)return{ok:false,why:'Không thấy nét vẽ. Thử kéo độ nhạy lên, hoặc chụp gần hơn và đủ sáng.'};
+  // giữ mảng lớn và mảng ở gần mảng lớn nhất (bỏ chữ ký, vết bẩn xa)
+  let big=null;for(const cp of comps)if(keep[cp.id]&&(!big||cp.n>big.n))big=cp;
+  const mx=Math.max(big.x1-big.x0,big.y1-big.y0)*.6;
+  for(const cp of comps)if(keep[cp.id]&&cp!==big){if(cp.x1<big.x0-mx||cp.x0>big.x1+mx||cp.y1<big.y0-mx||cp.y0>big.y1+mx)keep[cp.id]=0}
+  for(let i=0;i<N;i++)ink[i]=lab[i]&&keep[lab[i]]?1:0;
+  let bb={x0:w,y0:h,x1:0,y1:0};for(const cp of comps)if(keep[cp.id]){bb.x0=Math.min(bb.x0,cp.x0);bb.y0=Math.min(bb.y0,cp.y0);bb.x1=Math.max(bb.x1,cp.x1);bb.y1=Math.max(bb.y1,cp.y1)}
+  // bóng thân: nối nét gần nhau rồi lấp kín bên trong
+  const r=Math.max(2,Math.round(Math.max(bb.x1-bb.x0,bb.y1-bb.y0)*.014));
+  let sil;
+  if(fill){const dl=dilate(ink,w,h,r),out=new Uint8Array(N),q=new Int32Array(N);let qh=0,qt=0;
+    const push=i=>{if(!dl[i]&&!out[i]){out[i]=1;q[qt++]=i}};
+    for(let xx=0;xx<w;xx++){push(xx);push((h-1)*w+xx)}for(let y=0;y<h;y++){push(y*w);push(y*w+w-1)}
+    while(qh<qt){const j=q[qh++],xx=j%w,y=(j/w)|0;if(xx>0)push(j-1);if(xx<w-1)push(j+1);if(y>0)push(j-w);if(y<h-1)push(j+w)}
+    sil=new Uint8Array(N);for(let i=0;i<N;i++)sil[i]=out[i]?0:1;sil=erode(sil,w,h,r);for(let i=0;i<N;i++)if(ink[i])sil[i]=1}
+  else sil=dilate(ink,w,h,1);
+  let sb={x0:w,y0:h,x1:0,y1:0};for(let y=0;y<h;y++)for(let xx=0;xx<w;xx++)if(sil[y*w+xx]){if(xx<sb.x0)sb.x0=xx;if(xx>sb.x1)sb.x1=xx;if(y<sb.y0)sb.y0=y;if(y>sb.y1)sb.y1=y}
+  const P=3;sb.x0=Math.max(0,sb.x0-P);sb.y0=Math.max(0,sb.y0-P);sb.x1=Math.min(w-1,sb.x1+P);sb.y1=Math.min(h-1,sb.y1+P);
+  const tw=sb.x1-sb.x0+1,th=sb.y1-sb.y0+1;
+  if(tw<12||th<12)return{ok:false,why:'Hình vẽ quá nhỏ. Chụp gần hơn nhé.'};
+  const t=mk(tw,th),tx=t.getContext('2d'),od=tx.createImageData(tw,th),o=od.data;
+  for(let y=0;y<th;y++)for(let xx=0;xx<tw;xx++){const i=(y+sb.y0)*w+xx+sb.x0,k=(y*tw+xx)*4;
+    let a=0;for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){const X=xx+sb.x0+dx,Y=y+sb.y0+dy;if(X>=0&&Y>=0&&X<w&&Y<h)a+=sil[Y*w+X]}
+    if(!a)continue;
+    let R=clamp(d[i*4]/bR[i]*255,0,255),G=clamp(d[i*4+1]/bG[i]*255,0,255),B=clamp(d[i*4+2]/bB[i]*255,0,255);
+    if(ink[i]){const l=.299*R+.587*G+.114*B,s=1.35;R=l+(R-l)*s;G=l+(G-l)*s;B=l+(B-l)*s;R=255*Math.pow(clamp(R,0,255)/255,1.35);G=255*Math.pow(clamp(G,0,255)/255,1.35);B=255*Math.pow(clamp(B,0,255)/255,1.35)}
+    else{R=R*.3+253*.7;G=G*.3+250*.7;B=B*.3+243*.7}
+    o[k]=R;o[k+1]=G;o[k+2]=B;o[k+3]=Math.round(a/9*255)}
+  tx.putImageData(od,0,0);
+  const sc=Math.min(1,512/Math.max(tw,th)),fin=mk(Math.round(tw*sc),Math.round(th*sc));fin.getContext('2d').drawImage(t,0,0,fin.width,fin.height);
+  return{ok:true,tex:fin,inp:to28(ink,w,bb)}
+}
+
+/* ================= camera & cảm biến ================= */
+const vid=$('cam');let stream=null;
+async function startCam(){
+  if(stream&&stream.active)return true;
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia)return false;
+  try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080}},audio:false});vid.srcObject=stream;await vid.play().catch(()=>{});return true}
+  catch(e){return false}}
+const S={yaw:0,pitch:-.35,tYaw:0,tPitch:-.35,yaw0:null,gyro:false};
+addEventListener('deviceorientation',e=>{
+  if(e.alpha==null||e.beta==null)return;
+  const a=e.alpha*D2R,b=e.beta*D2R,g=e.gamma*D2R;
+  const sa=Math.sin(a),ca=Math.cos(a),sb=Math.sin(b),cb=Math.cos(b),sg=Math.sin(g),cg=Math.cos(g);
+  const x=-ca*sg-sa*sb*cg,y=-sa*sg+ca*sb*cg,z=-cb*cg;
+  const raw=Math.atan2(x,y);if(S.yaw0==null)S.yaw0=raw;
+  S.gyro=true;S.tYaw=wrap(raw-S.yaw0);S.tPitch=Math.asin(clamp(z,-1,1));
+});
+async function askGyro(){try{if(window.DeviceOrientationEvent&&typeof DeviceOrientationEvent.requestPermission==='function')await DeviceOrientationEvent.requestPermission()}catch(e){}}
+
+/* ================= âm thanh & giọng ================= */
+let AC=null;
+function ac(){if(!AC){try{AC=new(window.AudioContext||window.webkitAudioContext)()}catch(e){}}if(AC&&AC.state==='suspended')AC.resume();return AC}
+function blip(f0,f1,dur,type='sine',vol=.18,delay=0){const a=ac();if(!a||!SET.sound)return;const t=a.currentTime+delay,o=a.createOscillator(),g=a.createGain();
+  o.type=type;o.frequency.setValueAtTime(f0,t);o.frequency.exponentialRampToValueAtTime(Math.max(20,f1),t+dur);g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(vol,t+.012);g.gain.exponentialRampToValueAtTime(.0001,t+dur);o.connect(g).connect(a.destination);o.start(t);o.stop(t+dur+.03)}
+const PITCH={n:950,v:620,t:330};
+const WAVE={w:'triangle',f:'sine',s:'sine',t:'triangle',h:'square'};
+const SND={
+  happy(c){const b=PITCH[c.size]||620,ty=WAVE[c.mv];blip(b,b*1.6,.12,ty,ty==='square'?.07:.18);blip(b*1.25,b*2,.14,ty,ty==='square'?.07:.18,.13)},
+  pop(){[523,659,784,1047].forEach((f,i)=>blip(f,f*1.02,.18,'sine',.15,i*.07))},
+  eat(c){const b=(PITCH[c.size]||620)*.5;for(let i=0;i<4;i++)blip(b,b*.6,.06,'square',.06,i*.14)},
+  hop(c){const b=(PITCH[c.size]||620)*.7;blip(b*.8,b*1.4,.09,'sine',.07)},
+  shutter(){blip(2400,300,.06,'square',.08);blip(1200,150,.08,'square',.06,.07)}
+};
+let VI=null;function viVoice(){if(VI!==null)return VI;const vs=(window.speechSynthesis&&speechSynthesis.getVoices())||[];VI=vs.find(v=>/^vi/i.test(v.lang))||null;return VI}
+if(window.speechSynthesis)speechSynthesis.onvoiceschanged=()=>{VI=null};
+function say(c,text){if(!SET.voice||!window.speechSynthesis)return;try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);u.lang='vi-VN';const v=viVoice();if(v)u.voice=v;u.pitch={n:1.8,v:1.3,t:.6}[c.size]||1.2;u.rate=1.08;speechSynthesis.speak(u)}catch(e){}}
+
+/* ================= tạo nhân cách ================= */
+const NAMES=['Bông','Mây','Tí','Sún','Bi','Na','Mít','Kem','Cốm','Gạo','Lu','Su','Xoài','Đậu','Mochi','Tũn','Ú','Bơ','Nấm','Khoai','Miu','Tôm','Bột','Sóc','Chíp','Bon','Lạc','Sữa'];
+const TRAITS=['tò mò','nhút nhát','tinh nghịch','hay ăn','lười biếng','dũng cảm','hay hát','điệu đà','ngái ngủ','lắm mồm','tốt bụng','hơi cáu kỉnh','mơ mộng','hiếu động','thích được khen'];
+const MV={w:'Đi',f:'Bay',s:'Bơi',t:'Trườn',h:'Nhảy'};
+const MVLINE={w:['Đi dạo chút nào!','Phòng này rộng ghê!'],f:['Tớ bay cao lắm đó!','Vù vù, nhìn tớ nè!'],s:['Không khí ở đây cũng bơi được nè!','Bơi bơi bơi…'],t:['Sột soạt sột soạt…','Tớ trườn nhanh lắm!'],h:['Boing boing!','Nhảy cao chưa nè!']};
+function seedRand(seed){let s=seed>>>0||1;return()=>{s^=s<<13;s^=s>>>17;s^=s<<5;return(s>>>0)/4294967296}}
+function persona(c){
+  const R=seedRand(c.id.split('').reduce((a,ch)=>a*31+ch.charCodeAt(0)|0,7));
+  const tr=[];while(tr.length<3){const t=TRAITS[R()*TRAITS.length|0];if(!tr.includes(t))tr.push(t)}
+  c.traits=tr;c.stats={sucManh:2+(R()*8|0),tocDo:2+(R()*8|0),deThuong:3+(R()*8|0),phepThuat:1+(R()*10|0)};for(const k in c.stats)c.stats[k]=Math.min(10,c.stats[k]);
+  c.lines=['Chào cậu! Tớ là '+c.name+' nè!','Cảm ơn cậu đã vẽ ra tớ!','Cho tớ ăn bánh quy đi mà!','Hihi, nhột quá!','Tớ là '+c.vi+' '+tr[0]+' nhất quả đất!',...MVLINE[c.mv]];
+  c.intro=cap(c.name)+' là một '+(c.vi||'sinh vật bí ẩn')+' '+tr[0]+', '+tr[1]+' và '+tr[2]+'.'}
+
+/* ================= Gemini (tùy chọn) ================= */
+const PROMPT=`Đây là bức vẽ tay của một sinh vật do người chơi vẽ (đã tách khỏi nền giấy). Hãy tưởng tượng nó sống dậy trong căn phòng của người vẽ.
+Trả về DUY NHẤT một đối tượng JSON, tiếng Việt, đúng dạng:
+{"ten":"tên riêng dễ thương 1-3 từ","loai":"nó là con gì, ngắn gọn","diChuyen":"di|bay|boi|truon|nhay","kichCo":"nho|vua|to","huongMat":"trai|phai","tinhCach":["3 tính từ"],"chiSo":{"sucManh":1-10,"tocDo":1-10,"deThuong":1-10,"phepThuat":1-10},"loiThoai":["6 câu ngắn dưới 12 từ, ngôi thứ nhất (tớ), nó nói khi được chạm vào, hợp tính cách, vui vẻ, phù hợp trẻ em"],"gioiThieu":"1 câu giới thiệu"}
+diChuyen chọn theo hình vẽ (có cánh thì bay, cá thì bơi, rắn sâu thì trườn, không chân thì nhảy). huongMat là hướng đầu nó quay trong tranh.`;
+async function askGemini(b64){
+  if(SET.worker){const r=await fetch(SET.worker,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({image:b64,mime:'image/jpeg'})});
+    const j=await r.json().catch(()=>({}));if(!r.ok||j.error)throw new Error(j.error||('Worker trả lỗi '+r.status));return j}
+  if(!SET.key)throw new Error('Chưa gắn khóa');
+  const body={contents:[{parts:[{text:PROMPT},{inline_data:{mime_type:'image/jpeg',data:b64}}]}],generationConfig:{responseMimeType:'application/json',temperature:1}};
+  const call=m=>fetch('https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(m)+':generateContent',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':SET.key},body:JSON.stringify(body)});
+  let r=await call(SET.model||'gemini-2.5-flash');if(r.status===404)r=await call('gemini-flash-latest');
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok){const m=(j.error&&j.error.message)||'';throw new Error(r.status===429?'Hết lượt miễn phí tạm thời, thử lại sau ít phút':r.status===400||r.status===403?'Khóa không đúng hoặc chưa bật: '+m.slice(0,80):'Lỗi '+r.status+' '+m.slice(0,80))}
+  const t=j.candidates&&j.candidates[0]&&j.candidates[0].content&&j.candidates[0].content.parts.map(p=>p.text||'').join('');
+  return JSON.parse((t||'').replace(/^```(json)?|```$/g,''))}
+function applyAI(c,a){
+  const mv={di:'w',bay:'f',boi:'s',truon:'t',nhay:'h'}[String(a.diChuyen||'').toLowerCase()];
+  if(a.ten)c.name=String(a.ten).slice(0,24);if(a.loai)c.vi=String(a.loai).slice(0,40);if(mv)c.mv=mv;
+  const sz={nho:'n',vua:'v',to:'t'}[a.kichCo];if(sz)c.size=sz;if(a.huongMat==='trai')c.face=-1;if(a.huongMat==='phai')c.face=1;
+  if(Array.isArray(a.tinhCach)&&a.tinhCach.length)c.traits=a.tinhCach.slice(0,4).map(String);
+  if(a.chiSo)for(const k of['sucManh','tocDo','deThuong','phepThuat'])if(a.chiSo[k])c.stats[k]=clamp(Math.round(a.chiSo[k]),1,10);
+  if(Array.isArray(a.loiThoai)&&a.loiThoai.length)c.lines=a.loiThoai.slice(0,8).map(s=>String(s).slice(0,90));
+  if(a.gioiThieu)c.intro=String(a.gioiThieu).slice(0,200);c.ai=true}
+function jpegOf(img){const s=Math.min(1,512/Math.max(img.width,img.height)),c=mk(Math.round(img.width*s)+40,Math.round(img.height*s)+40),x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.drawImage(img,20,20,c.width-40,c.height-40);return c.toDataURL('image/jpeg',.85).split(',')[1]}
+
+/* ================= WebGL: vẽ sinh vật có lưới biến dạng ================= */
+const glc=$('gl'),gl=glc.getContext('webgl',{premultipliedAlpha:true,alpha:true,preserveDrawingBuffer:true});
+const under=$('under'),ux=under.getContext('2d'),over=$('over'),ox=over.getContext('2d');
+let W=0,H=0,F=1,DPR=1;
+function resize(){DPR=Math.min(2,devicePixelRatio||1);W=innerWidth;H=innerHeight;for(const c of[glc,under,over]){c.width=W*DPR;c.height=H*DPR}
+  ux.setTransform(DPR,0,0,DPR,0,0);ox.setTransform(DPR,0,0,DPR,0,0);if(gl)gl.viewport(0,0,glc.width,glc.height);F=(W/2)/Math.tan(HFOV/2)}
+addEventListener('resize',resize);resize();
+const VS=`attribute vec2 a;uniform vec2 uPos,uSize,uRes;uniform float uT,uMode,uFlip,uMov,uSqx,uSqy,uRot;varying vec2 vUv;
+void main(){float u=a.x-.5,h=1.-a.y,t=uT;float br=sin(t*2.2)*.03;vec2 q=vec2(u*(1.-br*.5),h*(1.+br));
+if(uMode<.5){float s=sin(t*10.)*uMov;if(h<.33)q.x+=s*.09*(.33-h)/.33*(u<0.?1.:-1.);q.x+=sin(t*1.3)*.02*h;}
+else if(uMode<1.5){float f=sin(t*(9.+uMov*5.));q.y+=f*.16*pow(abs(u)*2.,1.6);}
+else if(uMode<2.5){q.y+=sin(u*6.-t*6.)*.05*(.4+abs(u)*1.6);}
+else if(uMode<3.5){q.y+=sin(u*9.-t*(4.+uMov*4.))*.07;}
+else{q.x+=sin(t*5.+h*3.)*.025*h;}
+q.x*=uSqx;q.y*=uSqy;float c=cos(uRot),s2=sin(uRot);q=vec2(q.x*c-q.y*s2,q.x*s2+q.y*c);
+vec2 p=uPos+vec2(q.x*uSize.x*uFlip,-q.y*uSize.y);gl_Position=vec4(p.x/uRes.x*2.-1.,1.-p.y/uRes.y*2.,0.,1.);vUv=a;}`;
+const FS=`precision mediump float;uniform sampler2D uTex;uniform float uAlpha,uGlow;varying vec2 vUv;
+void main(){vec4 c=texture2D(uTex,vUv);c.rgb+=uGlow*c.a*vec3(1.,.85,.5);gl_FragColor=c*uAlpha;}`;
+let PRG,U={},NIDX=0;
+(function initGL(){if(!gl)return;
+  const sh=(t,s)=>{const o=gl.createShader(t);gl.shaderSource(o,s);gl.compileShader(o);if(!gl.getShaderParameter(o,gl.COMPILE_STATUS))console.error(gl.getShaderInfoLog(o));return o};
+  PRG=gl.createProgram();gl.attachShader(PRG,sh(gl.VERTEX_SHADER,VS));gl.attachShader(PRG,sh(gl.FRAGMENT_SHADER,FS));gl.linkProgram(PRG);gl.useProgram(PRG);
+  for(const n of['uPos','uSize','uRes','uT','uMode','uFlip','uMov','uSqx','uSqy','uRot','uTex','uAlpha','uGlow'])U[n]=gl.getUniformLocation(PRG,n);
+  const G=18,v=[],ix=[];for(let j=0;j<=G;j++)for(let i=0;i<=G;i++)v.push(i/G,j/G);
+  for(let j=0;j<G;j++)for(let i=0;i<G;i++){const k=j*(G+1)+i;ix.push(k,k+1,k+G+1,k+1,k+G+2,k+G+1)}
+  const vb=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,vb);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(v),gl.STATIC_DRAW);
+  const ib=gl.createBuffer();gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,ib);gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,new Uint16Array(ix),gl.STATIC_DRAW);NIDX=ix.length;
+  const al=gl.getAttribLocation(PRG,'a');gl.enableVertexAttribArray(al);gl.vertexAttribPointer(al,2,gl.FLOAT,false,0,0);
+  gl.enable(gl.BLEND);gl.blendFunc(gl.ONE,gl.ONE_MINUS_SRC_ALPHA);gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL,true);gl.uniform1i(U.uTex,0)})();
+const TEX=new Map();
+function texOf(c){if(!gl)return null;let t=TEX.get(c.id);if(t)return t.ready?t:null;t={ready:false};TEX.set(c.id,t);
+  const im=new Image();im.onload=()=>{t.g=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,t.g);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,im);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+    t.w=im.width;t.h=im.height;t.ready=true};im.src=c.img;return null}
+const MODE={w:0,f:1,s:2,t:3,h:4};
+function drawCre(d,x,y,hpx,o){const t=texOf(d);if(!t)return null;const wpx=hpx*t.w/t.h;
+  gl.bindTexture(gl.TEXTURE_2D,t.g);gl.uniform2f(U.uPos,x,y);gl.uniform2f(U.uSize,wpx,hpx);gl.uniform2f(U.uRes,W,H);
+  gl.uniform1f(U.uT,o.t);gl.uniform1f(U.uMode,MODE[d.mv]);gl.uniform1f(U.uFlip,o.flip);gl.uniform1f(U.uMov,o.mov||0);
+  gl.uniform1f(U.uSqx,o.sqx||1);gl.uniform1f(U.uSqy,o.sqy||1);gl.uniform1f(U.uRot,o.rot||0);gl.uniform1f(U.uAlpha,o.alpha==null?1:o.alpha);gl.uniform1f(U.uGlow,o.glow||0);
+  gl.drawElements(gl.TRIANGLES,NIDX,gl.UNSIGNED_SHORT,0);return{x0:x-wpx/2,x1:x+wpx/2,y0:y-hpx,y1:y}}
+
+/* ================= màn hình ================= */
+let SCR='home';
+function show(id){SCR=id;document.querySelectorAll('.scr').forEach(e=>e.classList.toggle('on',e.id===id));
+  vid.style.display=(id==='scan'||id==='room')?'block':'none';
+  if(id==='home')renderHome();if(window.speechSynthesis&&id!=='room'&&id!=='born')speechSynthesis.cancel()}
+function renderHome(){
+  const g=$('gal');g.innerHTML='';$('galT').hidden=!CRE.length;
+  for(const c of CRE){const e=document.createElement('button');e.className='card';e.innerHTML='<img alt=""><div></div>'+(ROOM.includes(c.id)?'<div class="in">đang ở trong phòng</div>':'');
+    e.querySelector('img').src=c.img;e.querySelector('div').textContent=c.name;e.onclick=()=>openBorn(c,false);g.appendChild(e)}
+  $('goRoom').hidden=!ROOM.length;$('goRoomT').textContent='Vào phòng ('+ROOM.length+' sinh vật)';aiState()}
+
+/* ---- quét ---- */
+$('goScan').onclick=async()=>{ac();show('scan');if(!await startCam()){toast('Không mở được camera. Hãy chọn ảnh có sẵn nhé.');show('home');$('file').click()}};
+$('goFile').onclick=$('scanFile').onclick=()=>{ac();$('file').click()};
+$('scanBack').onclick=()=>show('home');
+$('file').onchange=e=>{const f=e.target.files[0];e.target.value='';if(!f)return;const im=new Image();im.onload=()=>{const s=Math.min(1,1600/Math.max(im.width,im.height)),c=mk(Math.round(im.width*s),Math.round(im.height*s));c.getContext('2d').drawImage(im,0,0,c.width,c.height);URL.revokeObjectURL(im.src);openCut(c)};im.onerror=()=>toast('Không đọc được ảnh này');im.src=URL.createObjectURL(f)};
+$('shutter').onclick=()=>{
+  if(!vid.videoWidth){toast('Camera chưa sẵn sàng');return}
+  const r=$('guide').getBoundingClientRect(),vw=vid.videoWidth,vh=vid.videoHeight,sc=Math.max(W/vw,H/vh),ox0=(W-vw*sc)/2,oy0=(H-vh*sc)/2;
+  const sx=(r.left-ox0)/sc,sy=(r.top-oy0)/sc,sw=r.width/sc,shh=r.height/sc;
+  const c=mk(Math.round(sw),Math.round(shh));c.getContext('2d').drawImage(vid,sx,sy,sw,shh,0,0,c.width,c.height);
+  SND.shutter();const fl=$('flash');fl.style.transition='none';fl.style.opacity=.9;requestAnimationFrame(()=>{fl.style.transition='opacity .4s';fl.style.opacity=0});
+  openCut(c)};
+
+/* ---- bảng vẽ ---- */
+const pc=$('padCv'),px=pc.getContext('2d');let padStrokes=[],padCol='#1b1b1b',padSize=7,padCur=null;
+const COLS=['#1b1b1b','#e23b3b','#2f6fe4','#2aa84a','#ff9a1f','#9b4de0','#8a5a2b'];
+COLS.forEach(c=>{const b=document.createElement('button');b.className='dot'+(c===padCol?' on':'');b.style.background=c;b.onclick=()=>{padCol=c;document.querySelectorAll('#padCols .dot').forEach(d=>d.classList.toggle('on',d===b))};$('padCols').appendChild(b)});
+[4,7,14].forEach(s=>{const b=document.createElement('button');b.className='chip'+(s===padSize?' on':'');b.textContent=s===4?'Nét mảnh':s===7?'Vừa':'Đậm';b.onclick=()=>{padSize=s;document.querySelectorAll('#padSizes .chip').forEach(d=>d.classList.toggle('on',d===b))};$('padSizes').appendChild(b)});
+function padRedraw(){const s=pc.width/400;px.setTransform(1,0,0,1,0,0);px.fillStyle='#fff';px.fillRect(0,0,pc.width,pc.height);px.setTransform(s,0,0,s,0,0);px.lineCap=px.lineJoin='round';
+  for(const st of padStrokes){px.strokeStyle=st.c;px.lineWidth=st.s;px.beginPath();st.p.forEach((p,i)=>i?px.lineTo(p[0],p[1]):px.moveTo(p[0],p[1]));if(st.p.length===1)px.lineTo(st.p[0][0]+.1,st.p[0][1]);px.stroke()}}
+function padPt(e){const r=pc.getBoundingClientRect();return[(e.clientX-r.left)/r.width*400,(e.clientY-r.top)/r.height*400]}
+pc.addEventListener('pointerdown',e=>{pc.setPointerCapture(e.pointerId);padCur={c:padCol,s:padSize,p:[padPt(e)]};padStrokes.push(padCur);padRedraw()});
+pc.addEventListener('pointermove',e=>{if(!padCur)return;padCur.p.push(padPt(e));padRedraw()});
+pc.addEventListener('pointerup',()=>padCur=null);pc.addEventListener('pointercancel',()=>padCur=null);
+$('goPad').onclick=()=>{ac();show('pad');const r=pc.getBoundingClientRect();pc.width=pc.height=Math.round(r.width*Math.min(2,devicePixelRatio||1));padRedraw()};
+$('padBack').onclick=()=>show('home');$('padUndo').onclick=()=>{padStrokes.pop();padRedraw()};$('padClear').onclick=()=>{padStrokes=[];padRedraw()};
+$('padDone').onclick=()=>{if(!padStrokes.length){toast('Vẽ gì đó trước đã nhé!');return}const c=mk(560,560),x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,560,560);x.drawImage(pc,80,80,400,400);openCut(c)};
+
+/* ---- cắt ---- */
+let CUT=null;
+function openCut(src){CUT={src,res:null};$('sens').value=50;$('fill').checked=true;show('cut');runCut()}
+function runCut(){const r=extract(CUT.src,+$('sens').value,$('fill').checked);CUT.res=r;const cv=$('cutCv');
+  if(!r.ok){cv.width=CUT.src.width;cv.height=CUT.src.height;const x=cv.getContext('2d');x.globalAlpha=.35;x.drawImage(CUT.src,0,0);$('cutMsg').textContent=r.why;$('cutGo').disabled=true;return}
+  cv.width=r.tex.width;cv.height=r.tex.height;cv.getContext('2d').drawImage(r.tex,0,0);$('cutMsg').textContent='';$('cutGo').disabled=false}
+let cutT=0;$('sens').oninput=()=>{clearTimeout(cutT);cutT=setTimeout(runCut,120)};$('fill').onchange=runCut;
+$('cutBack').onclick=()=>show('home');
+$('cutGo').onclick=async()=>{const r=CUT.res;if(!r||!r.ok)return;
+  await Promise.race([netReady,new Promise(z=>setTimeout(z,4000))]);
+  const g=classify(r.inp),top=g[0];
+  const c={id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),img:r.tex.toDataURL('image/png'),guesses:g.slice(0,4).map(([e,p])=>[e,+p.toFixed(3)]),size:'v',face:1,ai:false,created:Date.now()};
+  if(top&&top[1]>=.2){c.sp=top[0];c.vi=viOf(top[0]);c.mv=(DICT[top[0]]||{}).m||'w'}else{c.sp='';c.vi='sinh vật bí ẩn';c.mv='w'}
+  c.name=cap(top&&top[1]>=.2?c.vi.replace(/^(cái|con|quả|chiếc|cây|củ|tấm|tờ|bộ|cặp|thỏi|hạt|khẩu|thanh|quyển|bông|đám|ngôi|cơn|đường|nét|người|nàng|bãi|dòng|ngón|bàn|đàn|cánh) /,''):'Bí')+' '+pick(NAMES);persona(c);
+  CRE.unshift(c);saveCre();openBorn(c,true);
+  if(SET.key||SET.worker)runAI(c,r.tex)};
+
+/* ---- ra đời ---- */
+let BORN=null;
+function openBorn(c,fresh){BORN={c,t0:performance.now()/1000,fresh};show('born');$('bornCard').scrollTop=0;$('born').scrollTop=0;renderBorn();if(fresh)SND.pop()}
+function chipRow(el,items,cur,on){el.innerHTML='';for(const[k,label]of items){const b=document.createElement('button');b.className='chip'+(k===cur?' on':'');b.textContent=label;b.onclick=()=>on(k);el.appendChild(b)}}
+function renderBorn(){const c=BORN.c;$('nameIn').value=c.name;
+  const g=c.guesses||[];
+  $('aiLine').innerHTML=c.aiBusy?'<span class="spin">✨</span> Gemini đang ngắm bức vẽ…':c.ai?'✨ <b>Gemini</b> đã đặt tên và tính cách':g.length?'🔮 AI trên máy đoán: <b>'+viOf(g[0][0])+'</b> ('+Math.round(g[0][1]*100)+'%)':'';
+  const sp=[];if(c.vi&&!g.some(([e])=>viOf(e)===c.vi))sp.push([c.vi,cap(c.vi)]);for(const[e]of g)sp.push([viOf(e),cap(viOf(e))]);if(!sp.some(s=>s[0]==='sinh vật bí ẩn'))sp.push(['sinh vật bí ẩn','Bí ẩn']);
+  chipRow($('spChips'),sp,c.vi,k=>{c.vi=k;const e=g.find(([e])=>viOf(e)===k);if(e&&!c.ai){c.sp=e[0];c.mv=(DICT[e[0]]||{}).m||c.mv}persona(c);c.ai=false;saveCre();renderBorn()});
+  chipRow($('mvChips'),Object.entries(MV),c.mv,k=>{c.mv=k;saveCre();renderBorn()});
+  chipRow($('szChips'),[['n','Nhỏ'],['v','Vừa'],['t','To']],c.size,k=>{c.size=k;saveCre();renderBorn()});
+  $('traits').textContent=(c.traits||[]).join(' · ');
+  const SN={sucManh:'Sức mạnh',tocDo:'Tốc độ',deThuong:'Dễ thương',phepThuat:'Phép thuật'};
+  $('stats').innerHTML=Object.keys(SN).map(k=>`<div class="stat"><span>${SN[k]}</span><i><b style="width:${c.stats[k]*10}%"></b></i><span>${c.stats[k]}</span></div>`).join('');
+  $('intro').textContent='“'+(c.intro||'')+'”';
+  $('aiBtn').hidden=!(SET.key||SET.worker)||c.aiBusy;$('bornDel').hidden=BORN.fresh;
+  $('bornGo').textContent=ROOM.includes(c.id)?'Gặp nó trong phòng 🏠':'Thả vào phòng 🏠'}
+$('nameIn').oninput=e=>{BORN.c.name=e.target.value.trim()||'Bé';saveCre()};
+$('faceBtn').onclick=()=>{BORN.c.face=-(BORN.c.face||1);saveCre()};
+$('aiBtn').onclick=()=>runAI(BORN.c);
+$('bornBack').onclick=()=>show('home');
+$('bornDel').onclick=()=>{const c=BORN.c;CRE=CRE.filter(x=>x!==c);ROOM=ROOM.filter(i=>i!==c.id);saveCre();show('home')};
+$('bornGo').onclick=()=>{const c=BORN.c;const isNew=!ROOM.includes(c.id);if(isNew){ROOM.push(c.id);if(ROOM.length>8)ROOM.shift();saveCre()}enterRoom(c.id)};
+async function runAI(c,tex){
+  c.aiBusy=true;if(BORN&&BORN.c===c)renderBorn();
+  try{let img=tex;if(!img){img=await new Promise((ok,no)=>{const i=new Image();i.onload=()=>ok(i);i.onerror=no;i.src=c.img})}
+    const a=await askGemini(jpegOf(img));applyAI(c,a);saveCre();toast('✨ Gemini: '+c.name+' là '+c.vi)}
+  catch(e){toast('Gemini: '+(e.message||'lỗi kết nối'),3500)}
+  c.aiBusy=false;if(BORN&&BORN.c===c&&SCR==='born')renderBorn()}
+
+/* ================= phòng ================= */
+const R={live:[],food:[],parts:[],feed:false,snap:false,lastTap:0};
+const SIZE_M={n:.28,v:.48,t:.75},SPEED={w:.35,f:.6,s:.4,t:.22,h:.55};
+function liveOf(d,spawn){const yaw=S.yaw+(spawn?0:rnd(-.5,.5)),dist=spawn?1.6:rnd(1.3,2.6);
+  return{d,x:dist*Math.sin(yaw),z:dist*Math.cos(yaw),y:0,vy:0,state:'idle',timer:rnd(.5,2),tx:0,tz:0,dir:1,flip:d.face||1,mov:0,land:0,glow:0,phase:rnd(0,9),born:spawn?0:1,bubble:null,rect:null,eat:0,alt:d.mv==='f'?rnd(.7,1.2):d.mv==='s'?rnd(.3,.6):0}}
+async function enterRoom(newId){
+  ac();askGyro();show('room');const ok=await startCam();if(!ok)toast('Không mở được camera, phòng sẽ có nền tối. Kéo màn hình để nhìn quanh.',3500);
+  if(newId==null||!R.live.length){R.live=[];}
+  const have=new Set(R.live.map(l=>l.d.id));
+  R.live=R.live.filter(l=>ROOM.includes(l.d.id));
+  for(const id of ROOM){if(have.has(id))continue;const d=CRE.find(c=>c.id===id);if(!d)continue;const l=liveOf(d,id===newId);R.live.push(l);if(id===newId)spawnFx(l)}
+  $('roomHint').style.opacity=1;setTimeout(()=>$('roomHint').style.opacity=0,4500);renderRoster()}
+function spawnFx(l){l.born=0;SND.pop();setTimeout(()=>talk(l,l.d.lines[0]),900)}
+function renderRoster(){const r=$('roster');r.innerHTML='';
+  for(const l of R.live){const b=document.createElement('div');b.className='rc';b.innerHTML='<img alt=""><button class="x">✕</button>';b.querySelector('img').src=l.d.img;
+    b.onclick=e=>{if(e.target.classList.contains('x')){ROOM=ROOM.filter(i=>i!==l.d.id);R.live=R.live.filter(q=>q!==l);saveCre();renderRoster();return}callOver(l)};r.appendChild(b)}}
+function callOver(l){const d=1.4;l.tx=d*Math.sin(S.yaw);l.tz=d*Math.cos(S.yaw);l.state='move';l.hi=true;l.timer=0}
+function talk(l,text){l.bubble={text,t:3.2};say(l.d,text)}
+function react(l){l.vy=Math.max(l.vy,2.4);l.y=Math.max(l.y,.001);l.glow=1;SND.happy(l.d);talk(l,pick(l.d.lines));if(navigator.vibrate)try{navigator.vibrate(30)}catch(e){}
+  for(let i=0;i<6;i++)R.parts.push({x:(l.rect.x0+l.rect.x1)/2+rnd(-30,30),y:l.rect.y0+rnd(0,30),vx:rnd(-40,40),vy:rnd(-120,-60),t:0,life:1.2,ch:pick(['💖','✨','💛'])});
+  if(l.state!=='move'){l.state='idle';l.timer=1.2}}
+function proj(x,y,z){const cy=Math.cos(S.yaw),sy=Math.sin(S.yaw),lx=x*cy-z*sy,lz=x*sy+z*cy,ly=y-EYE,cp=Math.cos(S.pitch),sp=Math.sin(S.pitch);
+  const z2=lz*cp+ly*sp,y2=ly*cp-lz*sp;if(z2<.15)return null;return{x:W/2+F*lx/z2,y:H/2-F*y2/z2,s:F/z2}}
+function floorAt(qx,qy){const cp=Math.cos(S.pitch),sp=Math.sin(S.pitch),lx=(qx-W/2)/F,y2=-(qy-H/2)/F;
+  const lz=cp-y2*sp,ly=sp+y2*cp;if(ly>=-.02)return null;const t=-EYE/ly,ax=lx*t,az=lz*t,cy=Math.cos(S.yaw),sy=Math.sin(S.yaw);
+  let x=ax*cy+az*sy,z=-ax*sy+az*cy;const d=Math.hypot(x,z);if(d>4){x*=4/d;z*=4/d}return{x,z}}
+function pickTarget(l){let a,d;
+  if(Math.random()<.7)a=S.yaw+rnd(-.6,.6);else a=Math.atan2(l.x,l.z)+rnd(-1,1);d=rnd(1.1,2.8);
+  l.tx=d*Math.sin(a);l.tz=d*Math.cos(a);l.state='move'}
+function updRoom(dt){
+  for(const l of R.live){const d=l.d,sp=SPEED[d.mv]*(.55+(d.stats.tocDo||5)/11)*(d.size==='t'?1.2:d.size==='n'?.8:1);
+    l.born=Math.min(1,l.born+dt*.9);l.glow=Math.max(0,l.glow-dt*2);if(l.bubble&&(l.bubble.t-=dt)<=0)l.bubble=null;l.land=Math.max(0,l.land-dt);
+    if(l.eat>0){l.eat-=dt;l.mov=0;continue}
+    // đồ ăn
+    if(R.food.length){let best=null,bd=6;for(const f of R.food){const q=Math.hypot(f.x-l.x,f.z-l.z);if(q<bd){bd=q;best=f}}if(best){l.food=best;l.tx=best.x;l.tz=best.z;l.state='move'}}
+    if(l.state==='idle'){l.mov+=(0-l.mov)*Math.min(1,dt*5);if((l.timer-=dt)<=0)pickTarget(l)}
+    else if(l.state==='move'){const dx=l.tx-l.x,dz=l.tz-l.z,dist=Math.hypot(dx,dz);
+      if(l.food&&!R.food.includes(l.food)){l.food=null;l.state='idle';l.timer=rnd(.5,1.5)}
+      else if(dist<.12){l.state='idle';l.timer=rnd(1.2,4);
+        if(l.food){R.food=R.food.filter(f=>f!==l.food);l.food=null;l.eat=1.4;SND.eat(d);talk(l,pick(['Ngon quá!','Măm măm!','Thêm cái nữa đi!','Bánh quy số một!']));
+          if(l.rect)for(let i=0;i<5;i++)R.parts.push({x:(l.rect.x0+l.rect.x1)/2+rnd(-20,20),y:l.rect.y0,vx:rnd(-30,30),vy:rnd(-90,-50),t:0,life:1.2,ch:'💛'})}
+        if(l.hi){l.hi=false;talk(l,pick(['Cậu gọi tớ hả?','Tớ đây nè!','Có gì vui không?']));SND.happy(d)}}
+      else{l.hx=dx/dist;l.hz=dz/dist;const v=sp*(d.mv==='h'?(l.y>0?1.6:0):1);l.x+=dx/dist*v*dt;l.z+=dz/dist*v*dt;l.mov+=(1-l.mov)*Math.min(1,dt*5);
+        if(d.mv==='h'&&l.y<=0&&l.vy<=0&&l.land<=0){l.vy=2.1;l.y=.001;SND.hop(d)}}}
+    if(l.y>0||l.vy>0){l.vy-=9*dt;l.y+=l.vy*dt;if(l.y<=0){l.y=0;l.vy=0;l.land=.22}}
+  }
+  for(const f of R.food)f.t+=dt;
+}
+function drawRoom(T){
+  ux.clearRect(0,0,W,H);ox.clearRect(0,0,W,H);
+  if(!stream||!stream.active){ux.fillStyle='#1d1826';ux.fillRect(0,0,W,H);ux.strokeStyle='rgba(255,255,255,.07)';for(let i=-6;i<=6;i++){ux.beginPath();let on=false;for(let k=.6;k<=8;k+=.4){const p=proj(i*.5,0,k);if(p){on?ux.lineTo(p.x,p.y):ux.moveTo(p.x,p.y);on=true}}ux.stroke()}}
+  // đồ ăn
+  ux.textAlign='center';ux.textBaseline='bottom';
+  for(const f of R.food){const p=proj(f.x,0,f.z);if(!p)continue;const s=Math.max(14,p.s*.12);ux.font=s+'px serif';ux.fillText('🍪',p.x,p.y+s*.2-Math.max(0,1-f.t*3)*30)}
+  const list=R.live.map(l=>{const yy=l.y+(l.alt?l.alt+Math.sin(T*1.6+l.phase)*.07:0);return{l,yy,p:proj(l.x,yy,l.z),g:proj(l.x,0,l.z),dist:Math.hypot(l.x,l.z)}}).sort((a,b)=>b.dist-a.dist);
+  gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT);
+  for(const{l,yy,p,g}of list){l.rect=null;if(!p){arrow(l);continue}const d=l.d,t=texOf(d);if(!t)continue;
+    const Lm=SIZE_M[d.size]||.4,asp=t.w/t.h,hm=asp>1?Lm/asp:Lm,ease=l.born<1?(1-Math.pow(1-l.born,3))*(1+Math.sin(l.born*9)*.25*(1-l.born)):1;
+    const hpx=p.s*hm*ease;if(p.x<-hpx*asp||p.x>W+hpx*asp){arrow(l);}
+    // hướng mặt theo chiều chạy trên màn hình
+    if(l.mov>.2&&l.hx!=null){const p2=proj(l.x+l.hx*.05,yy,l.z+l.hz*.05);if(p2&&Math.abs(p2.x-p.x)>.3)l.dir=Math.sign(p2.x-p.x)}
+    l.flip+=(l.dir*(d.face||1)-l.flip)*.2;
+    if(g){const rx=hpx*asp*.36,sh=1/(1+l.y*2+(l.alt||0)*1.5);ux.fillStyle=`rgba(0,0,0,${.32*sh})`;ux.beginPath();ux.ellipse(g.x,g.y,rx*sh,rx*.22*sh,0,0,7);ux.fill()}
+    let sqx=1,sqy=1,rot=0;
+    if(l.land>0){const k=l.land/.22;sqx=1+.18*k;sqy=1-.2*k}else if(l.y>0){sqx=.93;sqy=1.08}
+    if(l.eat>0){const k=Math.sin(l.eat*22);sqy=1-.08*k;sqx=1+.06*k}
+    if(d.mv==='w')rot=Math.sin(T*10+l.phase)*.05*l.mov;else if(d.mv==='f'||d.mv==='s')rot=-.12*l.mov*Math.sign(l.flip);
+    l.rect=drawCre(d,p.x,p.y,hpx,{t:T+l.phase,flip:l.flip,mov:l.mov,sqx,sqy,rot,glow:l.glow*.5+(l.born<1?(1-l.born)*.8:0),alpha:Math.min(1,l.born*3)});
+    if(l.born<1){for(let i=0;i<2;i++)R.parts.push({x:p.x+rnd(-hpx*.6,hpx*.6),y:p.y-rnd(0,hpx),vx:rnd(-20,20),vy:rnd(-60,-20),t:0,life:.9,ch:'✨'})}
+    if(l.bubble&&l.rect)bubble(ox,(l.rect.x0+l.rect.x1)/2,l.rect.y0-6,l.bubble.text,Math.min(1,l.bubble.t*3))}
+}
+function arrow(l){const rel=wrap(Math.atan2(l.x,l.z)-S.yaw),x=rel<0?18:W-18,y=H*.45;ox.save();ox.globalAlpha=.85;ox.fillStyle='#ffb547';ox.beginPath();
+  if(rel<0){ox.moveTo(x-10,y);ox.lineTo(x+6,y-12);ox.lineTo(x+6,y+12)}else{ox.moveTo(x+10,y);ox.lineTo(x-6,y-12);ox.lineTo(x-6,y+12)}ox.fill();
+  ox.font='12px system-ui';ox.textAlign=rel<0?'left':'right';ox.fillStyle='#fff';ox.shadowColor='#000';ox.shadowBlur=4;ox.fillText(l.d.name,rel<0?x+10:x-10,y+28);ox.restore()}
+function bubble(x2,cx,by,text,a){x2.save();x2.globalAlpha=a;x2.font='600 15px system-ui';const words=text.split(' '),lines=[];let cur='';
+  for(const w of words){const t=cur?cur+' '+w:w;if(x2.measureText(t).width>200&&cur){lines.push(cur);cur=w}else cur=t}if(cur)lines.push(cur);
+  const lw=Math.max(...lines.map(l=>x2.measureText(l).width))+22,lh=20,bh=lines.length*lh+14;let bx=clamp(cx-lw/2,8,W-lw-8),y0=Math.max(8,by-bh-10);
+  x2.fillStyle='rgba(255,255,255,.95)';x2.beginPath();x2.roundRect?x2.roundRect(bx,y0,lw,bh,12):x2.rect(bx,y0,lw,bh);x2.fill();
+  x2.beginPath();x2.moveTo(clamp(cx,bx+14,bx+lw-14)-7,y0+bh);x2.lineTo(clamp(cx,bx+14,bx+lw-14),y0+bh+9);x2.lineTo(clamp(cx,bx+14,bx+lw-14)+7,y0+bh);x2.fill();
+  x2.fillStyle='#2a2133';x2.textAlign='left';x2.textBaseline='top';lines.forEach((l,i)=>x2.fillText(l,bx+11,y0+8+i*lh));x2.restore()}
+function drawParts(dt){ox.textAlign='center';ox.textBaseline='middle';R.parts=R.parts.filter(p=>(p.t+=dt)<p.life);
+  for(const p of R.parts){p.x+=p.vx*dt;p.y+=p.vy*dt;ox.globalAlpha=1-p.t/p.life;ox.font='18px serif';ox.fillText(p.ch,p.x,p.y)}ox.globalAlpha=1}
+
+/* chạm trong phòng */
+let pd=null;
+$('room').addEventListener('pointerdown',e=>{if(e.target.closest('button,.rc,#roster'))return;pd={x:e.clientX,y:e.clientY,x0:e.clientX,y0:e.clientY,m:0,t:performance.now()}});
+addEventListener('pointermove',e=>{if(!pd||SCR!=='room')return;const dx=e.clientX-pd.x,dy=e.clientY-pd.y;pd.m+=Math.abs(dx)+Math.abs(dy);pd.x=e.clientX;pd.y=e.clientY;
+  if(!S.gyro){S.tYaw-=dx*.005;S.tPitch=clamp(S.tPitch+dy*.004,-1.2,.6)}});
+addEventListener('pointerup',e=>{if(!pd||SCR!=='room'){pd=null;return}const tap=pd.m<14;pd=null;if(!tap)return;
+  const near=R.live.filter(l=>l.rect).sort((a,b)=>Math.hypot(a.x,a.z)-Math.hypot(b.x,b.z));
+  for(const l of near){const r=l.rect,pad=14;if(e.clientX>r.x0-pad&&e.clientX<r.x1+pad&&e.clientY>r.y0-pad&&e.clientY<r.y1+pad){react(l);return}}
+  if(R.feed){const f=floorAt(e.clientX,e.clientY);if(f){R.food.push({x:f.x,z:f.z,t:0});if(R.food.length>6)R.food.shift();blip(700,500,.08,'sine',.12)}else toast('Hãy chạm xuống sàn nhà')}});
+$('feed').onclick=()=>{R.feed=!R.feed;$('feed').classList.toggle('on',R.feed);if(R.feed)toast('Chạm xuống sàn để thả bánh quy')};
+$('roomBack').onclick=()=>show('home');$('goRoom').onclick=()=>enterRoom(null);$('roomAdd').onclick=()=>$('goScan').onclick();
+$('snap').onclick=()=>{R.snap=true};
+function doSnap(){const c=mk(Math.round(W*DPR),Math.round(H*DPR)),x=c.getContext('2d');
+  if(stream&&stream.active&&vid.videoWidth){const vw=vid.videoWidth,vh=vid.videoHeight,sc=Math.max(c.width/vw,c.height/vh);x.drawImage(vid,(c.width-vw*sc)/2,(c.height-vh*sc)/2,vw*sc,vh*sc)}else{x.fillStyle='#1d1826';x.fillRect(0,0,c.width,c.height)}
+  x.drawImage(under,0,0);x.drawImage(glc,0,0);x.drawImage(over,0,0);SND.shutter();
+  c.toBlob(async b=>{if(!b)return;const f=new File([b],'tranh-song.png',{type:'image/png'});
+    try{if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f],title:'Tranh Sống'});return}}catch(e){if(e&&e.name==='AbortError')return}
+    const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='tranh-song.png';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),4000);toast('Đã lưu ảnh')},'image/png')}
+
+/* ================= vòng lặp ================= */
+let last=performance.now();
+function frame(now){const dt=Math.min(.05,(now-last)/1000);last=now;const T=now/1000;
+  S.yaw+=wrap(S.tYaw-S.yaw)*(S.gyro?.4:.5);S.pitch+=(S.tPitch-S.pitch)*(S.gyro?.4:.5);
+  if(SCR==='room'){updRoom(dt);drawRoom(T);drawParts(dt);if(R.snap){R.snap=false;doSnap()}}
+  else if(SCR==='born'&&BORN){ux.clearRect(0,0,W,H);ox.clearRect(0,0,W,H);gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT);
+    const r=$('stage').getBoundingClientRect(),t=texOf(BORN.c);
+    if(t&&r.bottom>0){const k=Math.min(1,(T-BORN.t0)*1.4),e=1-Math.pow(1-k,3),asp=t.w/t.h,hp=Math.min(r.height*.72,r.width*.8/asp)*e*(1+Math.sin(k*10)*.15*(1-k));
+      const fy=r.bottom-24;ux.fillStyle='rgba(0,0,0,.35)';ux.beginPath();ux.ellipse(r.left+r.width/2,fy,hp*asp*.36,hp*asp*.07,0,0,7);ux.fill();
+      const bob=BORN.c.mv==='f'||BORN.c.mv==='s'?Math.sin(T*1.6)*8-14:0;
+      drawCre(BORN.c,r.left+r.width/2,fy+bob,hp,{t:T,flip:BORN.c.face||1,mov:.6,glow:(1-k)*.8})}}
+  else if(SCR!=='room'){gl&&gl.clear(gl.COLOR_BUFFER_BIT);ux.clearRect(0,0,W,H);ox.clearRect(0,0,W,H)}
+  requestAnimationFrame(frame)}
+requestAnimationFrame(frame);
+
+/* ================= cài đặt ================= */
+$('goSet').onclick=()=>{$('keyIn').value=SET.key;$('workerIn').value=SET.worker;$('modelIn').value=SET.model;$('sndIn').checked=SET.sound;$('voiceIn').checked=SET.voice;$('setMsg').textContent='';show('set')};
+$('setBack').onclick=()=>{saveFields();show('home')};
+function saveFields(){SET.key=$('keyIn').value.trim();SET.worker=$('workerIn').value.trim();SET.model=$('modelIn').value.trim()||'gemini-2.5-flash';SET.sound=$('sndIn').checked;SET.voice=$('voiceIn').checked;saveSet()}
+$('setTest').onclick=async()=>{saveFields();const m=$('setMsg');if(!SET.key&&!SET.worker){m.textContent='Đã lưu. Chưa gắn Gemini, game vẫn chạy bằng AI trên máy.';return}
+  m.innerHTML='<span class="spin">✨</span> Đang thử…';
+  const c=mk(140,140),x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,140,140);x.lineWidth=5;x.beginPath();x.ellipse(65,70,40,24,0,0,7);x.moveTo(105,70);x.lineTo(130,50);x.lineTo(130,90);x.closePath();x.stroke();
+  try{const a=await askGemini(jpegOf(c));m.textContent='✅ Kết nối được! Thử vẽ con cá, Gemini gọi nó là “'+(a.ten||'?')+'”.'}catch(e){m.textContent='❌ '+e.message}};
+
+renderHome();
+</script>
+</body>
+</html>
