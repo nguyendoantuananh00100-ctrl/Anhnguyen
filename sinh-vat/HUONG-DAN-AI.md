@@ -29,3 +29,11 @@ Worker là một máy chủ nhỏ miễn phí, giữ khóa giúp bạn. Người
 - Gói miễn phí của Gemini có giới hạn số lượt mỗi phút và mỗi ngày. Khi hết lượt, game báo "Hết lượt miễn phí tạm thời" và vẫn chơi tiếp bằng AI trên máy.
 - Ở gói miễn phí, Google có thể dùng dữ liệu gửi lên để cải thiện dịch vụ. Game chỉ gửi hình sinh vật đã cắt ra, không gửi ảnh phòng.
 - Game tự chọn bản Gemini Flash mới nhất còn dùng được. Khi máy chủ Gemini quá tải (lỗi 503), game tự thử lại rồi chuyển sang bản Flash khác. Muốn ép một bản cụ thể thì điền ô "Tên mô hình Gemini" trong cài đặt (với Worker: thêm biến `MODEL`).
+
+## Trò chuyện bằng giọng nói và chiêu đặc biệt
+
+- **Chiêu đặc biệt:** khi Gemini xem tranh, nó đặt thêm cho sinh vật một chiêu riêng (tên, biểu tượng, câu hô). Chiêu có một trong bốn hiệu ứng: đòn cực mạnh, gây choáng (đối thủ mất lượt), hồi nhiều máu, hoặc lá chắn chặn trọn đòn kế tiếp. Mỗi trận dùng được 1 lần. Không có Gemini thì game tự đặt chiêu theo chỉ số mạnh nhất. Sinh vật cũ: mở nó ra và bấm ✨ Hỏi Gemini để có chiêu riêng.
+- **Nói chuyện:** trong phòng, giữ nút 🎤 rồi nói, thả ra để gửi (hoặc chạm nhanh một lần để nói rảnh tay, chạm lần nữa để gửi). Sinh vật gần giữa màn hình nhất (hoặc con bạn vừa chạm) sẽ trả lời bằng giọng đọc và bong bóng thoại, và có thể làm theo lời bạn: nhảy múa, ngủ, xoay vòng, ngồi, lại đây, ăn bánh…
+- Không có Gemini: sinh vật vẫn hiểu các lệnh đơn giản ("nhảy đi", "ngủ đi", "lại đây"…) nếu trình duyệt có nhận giọng nói (Chrome trên Android). Nút ⌨️ để gõ chữ thay cho nói.
+- Có Gemini: trên máy không có nhận giọng nói sẵn, game ghi âm ngắn (tối đa 15 giây) và gửi cho Gemini nghe. Mỗi câu nói dùng 1 lượt Gemini miễn phí.
+- Nếu dùng Worker: hãy cập nhật lại mã `worker.js` mới để Worker hiểu phần trò chuyện.
