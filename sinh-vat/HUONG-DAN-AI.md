@@ -28,4 +28,4 @@ Worker là một máy chủ nhỏ miễn phí, giữ khóa giúp bạn. Người
 
 - Gói miễn phí của Gemini có giới hạn số lượt mỗi phút và mỗi ngày. Khi hết lượt, game báo "Hết lượt miễn phí tạm thời" và vẫn chơi tiếp bằng AI trên máy.
 - Ở gói miễn phí, Google có thể dùng dữ liệu gửi lên để cải thiện dịch vụ. Game chỉ gửi hình sinh vật đã cắt ra, không gửi ảnh phòng.
-- Nếu Google đổi tên mô hình, sửa ô "Tên mô hình Gemini" trong cài đặt (với Worker: thêm biến `MODEL`).
+- Game tự chọn bản Gemini Flash mới nhất còn dùng được. Khi máy chủ Gemini quá tải (lỗi 503), game tự thử lại rồi chuyển sang bản Flash khác. Muốn ép một bản cụ thể thì điền ô "Tên mô hình Gemini" trong cài đặt (với Worker: thêm biến `MODEL`).

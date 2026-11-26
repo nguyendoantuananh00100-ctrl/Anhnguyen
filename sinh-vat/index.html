@@ -275,7 +275,7 @@ input[type=range]{width:100%;accent-color:var(--acc)}
   <div class="lab">Cách 2: địa chỉ Cloudflare Worker (để chia sẻ link cho bạn bè)</div>
   <input class="field" id="workerIn" type="url" placeholder="https://tranh-song.ten-ban.workers.dev" autocomplete="off">
   <div class="lab">Tên mô hình Gemini</div>
-  <input class="field" id="modelIn" placeholder="gemini-2.5-flash" autocomplete="off">
+  <input class="field" id="modelIn" placeholder="Để trống: game tự chọn bản Flash mới nhất" autocomplete="off">
   <div class="row" style="margin-top:12px"><button class="btn pri" id="setTest">Lưu và kiểm tra</button><span class="note grow" id="setMsg"></span></div>
   <p class="note">Hướng dẫn lấy khóa từng bước: <a href="https://github.com/nguyendoantuananh00100-ctrl/anhnguyen/blob/main/sinh-vat/HUONG-DAN-AI.md" target="_blank" rel="noopener">HUONG-DAN-AI.md</a>. Lưu ý: ở gói miễn phí, Google có thể dùng ảnh gửi lên để cải thiện dịch vụ.</p>
   <h2>Âm thanh</h2>
@@ -293,8 +293,9 @@ const mk=(w,h)=>{const c=document.createElement('canvas');c.width=w;c.height=h;r
 function toast(t,ms=2200){const e=$('toast');e.textContent=t;e.style.opacity=1;clearTimeout(toast.h);toast.h=setTimeout(()=>e.style.opacity=0,ms)}
 
 /* ================= lưu trữ ================= */
-const SET={key:'',worker:'',model:'gemini-2.5-flash',sound:true,voice:true};
+const SET={key:'',worker:'',model:'',sound:true,voice:true};
 try{Object.assign(SET,JSON.parse(localStorage.getItem('tranhsong-set')||'{}'))}catch(e){}
+if(SET.model==='gemini-2.5-flash')SET.model=''; // bản cũ sắp ngừng: để game tự chọn
 const saveSet=()=>{try{localStorage.setItem('tranhsong-set',JSON.stringify(SET))}catch(e){}};
 let CRE=[],ROOM=[];
 try{CRE=JSON.parse(localStorage.getItem('tranhsong-cre')||'[]')}catch(e){}
@@ -541,12 +542,38 @@ async function askGemini(b64){
     const j=await r.json().catch(()=>({}));if(!r.ok||j.error)throw new Error(j.error||('Worker trả lỗi '+r.status));return j}
   if(!SET.key)throw new Error('Chưa gắn khóa');
   const body={contents:[{parts:[{text:PROMPT},{inline_data:{mime_type:'image/jpeg',data:b64}}]}],generationConfig:{responseMimeType:'application/json',temperature:1}};
-  const call=m=>fetch('https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(m)+':generateContent',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':SET.key},body:JSON.stringify(body)});
-  let r=await call(SET.model||'gemini-2.5-flash');if(r.status===404)r=await call('gemini-flash-latest');
-  const j=await r.json().catch(()=>({}));
-  if(!r.ok){const m=(j.error&&j.error.message)||'';throw new Error(r.status===429?'Hết lượt miễn phí tạm thời, thử lại sau ít phút':r.status===400||r.status===403?'Khóa không đúng hoặc chưa bật: '+m.slice(0,80):'Lỗi '+r.status+' '+m.slice(0,80))}
-  const t=j.candidates&&j.candidates[0]&&j.candidates[0].content&&j.candidates[0].content.parts.map(p=>p.text||'').join('');
-  return JSON.parse((t||'').replace(/^```(json)?|```$/g,''))}
+  const call=m=>fetch(GBASE+'/'+encodeURIComponent(m)+':generateContent',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':SET.key},body:JSON.stringify(body)});
+  // thử mô hình đang dùng; quá tải thì đợi rồi thử lại; vẫn lỗi thì tự chuyển sang mô hình Flash khác còn dùng được
+  const tried=new Set();let cands=SET.model?[SET.model]:[],last=[0,''];
+  for(let round=0;round<5;round++){
+    if(!cands.length){cands=(await listModels()).filter(m=>!tried.has(m)).slice(0,3);if(!cands.length)break}
+    const m=cands.shift();tried.add(m);
+    for(let a=0;a<2;a++){let r;try{r=await call(m)}catch(e){last=[-1,String(e.message||e)];break}
+      const j=await r.json().catch(()=>({}));
+      if(r.ok){const t=j.candidates&&j.candidates[0]&&j.candidates[0].content&&j.candidates[0].content.parts.map(p=>p.text||'').join('');
+        const out=JSON.parse((t||'').replace(/^```(json)?|```$/g,''));if(m!==SET.model){SET.model=m;saveSet()}return out}
+      last=[r.status,(j.error&&j.error.message)||''];
+      if(r.status===503||r.status===500){await wait(1500*(a+1));continue}
+      break}
+    if(last[0]===401||/API key/i.test(last[1]))break}
+  throw new Error(gErr(last[0],last[1]))}
+const GBASE='https://generativelanguage.googleapis.com/v1beta/models';
+const wait=ms=>new Promise(r=>setTimeout(r,ms));
+let MODELS=null;
+async function listModels(){if(MODELS)return MODELS;MODELS=[];
+  try{const r=await fetch(GBASE+'?pageSize=200',{headers:{'x-goog-api-key':SET.key}});const j=await r.json();
+    const ver=n=>{const x=n.match(/(\d+(?:\.\d+)?)/);return x?+x[1]:0};
+    MODELS=(j.models||[]).filter(m=>(m.supportedGenerationMethods||[]).includes('generateContent')).map(m=>m.name.replace(/^models\//,''))
+      .filter(n=>/flash/.test(n)&&!/image|tts|live|audio|embed|thinking|exp|robot|computer|native/.test(n))
+      .sort((a,b)=>(/preview/.test(a)-/preview/.test(b))||(ver(b)-ver(a))||(/lite/.test(a)-/lite/.test(b)))}catch(e){}
+  return MODELS}
+function gErr(st,m){
+  if(st===-1)return 'Không kết nối được tới Gemini. Kiểm tra mạng nhé.';
+  if(st===429)return 'Hết lượt miễn phí tạm thời. Thử lại sau ít phút nhé.';
+  if(st===503||st===500)return 'Máy chủ Gemini đang quá tải (không phải lỗi của bạn). Thử lại sau ít phút, game vẫn dùng AI trên máy.';
+  if(st===401||/API key/i.test(m))return 'Khóa Gemini không đúng hoặc chưa được bật.';
+  if(!st)return 'Không tìm thấy mô hình Gemini nào dùng được với khóa này.';
+  return 'Lỗi '+st+': '+m.slice(0,90)}
 function applyAI(c,a){
   const mv={di:'w',bay:'f',boi:'s',truon:'t',nhay:'h'}[String(a.diChuyen||'').toLowerCase()];
   if(a.ten)c.name=String(a.ten).slice(0,24);if(a.loai)c.vi=String(a.loai).slice(0,40);if(mv)c.mv=mv;
@@ -1003,11 +1030,11 @@ $('bQuit').onclick=()=>{if(BT)BT.live=false;BT=null;netStop();show('arena')};
 /* ================= cài đặt ================= */
 $('goSet').onclick=()=>{$('keyIn').value=SET.key;$('workerIn').value=SET.worker;$('modelIn').value=SET.model;$('sndIn').checked=SET.sound;$('voiceIn').checked=SET.voice;$('setMsg').textContent='';show('set')};
 $('setBack').onclick=()=>{saveFields();show('home')};
-function saveFields(){SET.key=$('keyIn').value.trim();SET.worker=$('workerIn').value.trim();SET.model=$('modelIn').value.trim()||'gemini-2.5-flash';SET.sound=$('sndIn').checked;SET.voice=$('voiceIn').checked;saveSet()}
+function saveFields(){SET.key=$('keyIn').value.trim();SET.worker=$('workerIn').value.trim();SET.model=$('modelIn').value.trim();MODELS=null;SET.sound=$('sndIn').checked;SET.voice=$('voiceIn').checked;saveSet()}
 $('setTest').onclick=async()=>{saveFields();const m=$('setMsg');if(!SET.key&&!SET.worker){m.textContent='Đã lưu. Chưa gắn Gemini, game vẫn chạy bằng AI trên máy.';return}
   m.innerHTML='<span class="spin">✨</span> Đang thử…';
   const c=mk(140,140),x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,140,140);x.lineWidth=5;x.beginPath();x.ellipse(65,70,40,24,0,0,7);x.moveTo(105,70);x.lineTo(130,50);x.lineTo(130,90);x.closePath();x.stroke();
-  try{const a=await askGemini(jpegOf(c));m.textContent='✅ Kết nối được! Thử vẽ con cá, Gemini gọi nó là “'+(a.ten||'?')+'”.'}catch(e){m.textContent='❌ '+e.message}};
+  try{const a=await askGemini(jpegOf(c));m.textContent='✅ Kết nối được'+(SET.model&&!SET.worker?' (mô hình '+SET.model+')':'')+'! Thử vẽ con cá, Gemini gọi nó là “'+(a.ten||'?')+'”.';$('modelIn').value=SET.model}catch(e){m.textContent='❌ '+e.message}};
 
 renderHome();
 </script>
