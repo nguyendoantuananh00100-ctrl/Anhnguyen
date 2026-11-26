@@ -34,6 +34,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--
 .bul{display:flex;gap:3px;margin-top:4px}.bul i{width:7px;height:20px;border-radius:4px 4px 2px 2px;background:#ffcf3a;box-shadow:0 1px 0 #000}.bul i.e{background:#fff2}
 .btn{pointer-events:auto;font:800 18px "Baloo 2",sans-serif;color:#14061f;border:0;border-radius:50%;box-shadow:0 5px 0 #0008,inset 0 -6px 0 #0003}
 #reload{width:74px;height:74px;background:#ffcf3a}
+.lit #cam{filter:brightness(1.1) saturate(.8) contrast(1.05)}#cam{transition:filter .25s}
 .lcol{display:flex;flex-direction:column;align-items:center;gap:10px}
 #lampBtn{width:62px;height:62px;font-size:15px;background:conic-gradient(#fff7c2 var(--e,100%),#5a4a7a 0);color:#14061f}
 #lampBtn.on{box-shadow:0 0 0 4px #fff7c2,0 0 30px 8px #fff7c2aa}#lampBtn.low{opacity:.55}
@@ -264,7 +265,7 @@ const DIFF={easy:{spd:.8,dmg:.6,cnt:.8,ammo:1.3,name:'Dễ: quái chậm, cắn 
 const DF=()=>DIFF[(G&&G.diff)||SET.diff]||DIFF.normal;
 function saveSet(){try{localStorage.setItem('thachma-set',JSON.stringify(SET))}catch(e){}applySet()}
 function applySet(){if(MUS.g)MUS.g.gain.setTargetAtTime(MUS.on?SET.mv/100:0,AC.currentTime,.1);if(sfxBus)sfxBus.gain.setTargetAtTime(SET.sv/100,AC.currentTime,.05);
-  $('sMv').value=SET.mv;$('sSv').value=SET.sv;$('sSens').value=SET.sens;$('sSensV').textContent='×'+(SET.sens/100).toFixed(1);$('sVib').checked=SET.vib;$('sVoice').checked=SET.voice!==false;$('voiceNote').textContent=VO.note();
+  $('sMv').value=SET.mv;$('sSv').value=SET.sv;$('sSens').value=SET.sens;$('sSensV').textContent='×'+(SET.sens/100).toFixed(1);$('sVib').checked=SET.vib;$('sVoice').checked=SET.voice!==false;$('voiceNote').textContent=VO.note()+' · Đèn flash: '+(!S.cam?'chưa mở camera':TORCH.ok?'có':'trình duyệt không cho bật')+(TORCH.label?' ('+TORCH.label+')':'');
   document.querySelectorAll('.seg button').forEach(b=>b.classList.toggle('on',b.dataset.d===SET.diff));$('diffNote').textContent=DIFF[SET.diff].name}
 let sfxBus=null;
 
@@ -920,19 +921,35 @@ function darkAngle(){const w=DK.map(d=>Math.pow(d,4)),sum=w.reduce((a,b)=>a+b,0)
   return clamp((b/(DKN-1)*2-1)*ARC+rnd(-.08,.08),-ARC,ARC)}
 /* Đèn Trăng: bật đèn flash thật của camera sau nếu máy cho phép */
 function camTrack(){return vid.srcObject&&vid.srcObject.getVideoTracks&&vid.srcObject.getVideoTracks()[0]}
-function torch(on){const tr=camTrack();if(!tr||!tr.getCapabilities)return false;let c={};try{c=tr.getCapabilities()}catch(e){}if(!c.torch)return false;tr.applyConstraints({advanced:[{torch:on}]}).catch(()=>{});return true}
+const TORCH={ok:false,probed:false,label:'',why:''};
+async function warm(tr){try{if(window.ImageCapture){const ic=new ImageCapture(tr);await Promise.race([ic.getPhotoCapabilities(),new Promise(r=>setTimeout(r,1500))])}}catch(e){}}
+function hasTorch(tr){try{const c=tr.getCapabilities&&tr.getCapabilities();return!!(c&&c.torch)}catch(e){return false}}
+async function torchProbe(){if(TORCH.probed||!S.cam)return;TORCH.probed=true;
+  let tr=camTrack();if(!tr)return;await warm(tr);TORCH.label=tr.label||'';
+  if(hasTorch(tr)){TORCH.ok=true;return}
+  // máy nhiều camera sau: thử từng camera sau khác để tìm cái có đèn flash
+  try{const cur=(tr.getSettings&&tr.getSettings().deviceId)||'',devs=(await navigator.mediaDevices.enumerateDevices()).filter(d=>d.kind==='videoinput'&&d.deviceId&&d.deviceId!==cur&&!/front|trước|user|facing front/i.test(d.label));
+    if(!devs.length){TORCH.why='no-torch';return}
+    for(const d of devs.slice(0,4)){tr.stop();let st=null;
+      try{st=await navigator.mediaDevices.getUserMedia({video:{deviceId:{exact:d.deviceId}},audio:false})}catch(e){}
+      if(st){const t2=st.getVideoTracks()[0];await warm(t2);if(hasTorch(t2)){vid.srcObject=st;vid.play().catch(()=>{});TORCH.ok=true;TORCH.label=t2.label||d.label;return}st.getTracks().forEach(x=>x.stop())}}
+    const st=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});vid.srcObject=st;vid.play().catch(()=>{});
+  }catch(e){TORCH.why=String(e&&e.name||e)}
+  if(!TORCH.ok)TORCH.why=TORCH.why||'no-torch'}
+function torch(on){if(!on)document.body.classList.remove('lit');const tr=camTrack();if(!tr)return false;if(!TORCH.ok&&!hasTorch(tr))return false;
+  tr.applyConstraints({advanced:[{torch:on}]}).catch(()=>tr.applyConstraints({torch:on}).catch(()=>{}));return true}
 function lampToggle(){if(S.mode!=='play'||!G)return;
   if(!G.lamp&&G.lampE<15){hint('Đèn Trăng đang sạc lại',1.2);return}
   G.lamp=!G.lamp;const real=torch(G.lamp);sfx.click();
-  if(G.lamp){if(!G.lampUsed){G.lampUsed=1;if(!real)hint(S.cam?'Máy không cho bật đèn flash, dùng ánh trăng ảo':'Đèn Trăng: ánh trăng đẩy lùi quái',2.2);say('ut','Đúng rồi, soi thẳng vào. Ký ức sợ ánh trăng thật lắm.',3.5)}vib(30)}
+  if(G.lamp){if(!G.lampUsed){G.lampUsed=1;if(!real)hint(S.cam?'Trình duyệt không cho bật đèn flash trên máy này, dùng ánh trăng ảo':'Đèn Trăng: ánh trăng đẩy lùi quái',2.2);say('ut','Đúng rồi, soi thẳng vào. Ký ức sợ ánh trăng thật lắm.',3.5)}vib(30)}
   lampUi()}
-function lampUi(){const b=$('lampBtn');b.style.setProperty('--e',Math.round(G.lampE)+'%');b.classList.toggle('on',!!G.lamp);b.classList.toggle('low',!G.lamp&&G.lampE<15)}
+function lampUi(){document.body.classList.toggle('lit',!!G.lamp);const b=$('lampBtn');b.style.setProperty('--e',Math.round(G.lampE)+'%');b.classList.toggle('on',!!G.lamp);b.classList.toggle('low',!G.lamp&&G.lampE<15)}
 function lampTick(dt){if(G.lamp){G.lampE-=18*dt;if(G.lampE<=0){G.lampE=0;G.lamp=false;torch(false);hint('Đèn Trăng hết pin, chờ sạc',1.4)}}else G.lampE=Math.min(100,G.lampE+7*dt);lampUi()}
 function lampPush(dt){const L=[];if(G.lamp)L.push(S.yaw);for(const c of NET.conns)if(c.aim&&c.aim.l)L.push(c.aim.y);if(!L.length||G.freeze)return;
   for(const m of G.mons){if(m.type==='boss')continue;if(L.some(a=>Math.abs(wrap(m.a-a))<.3)&&m.d<17){m.d=Math.min(26,m.d+(m.spd+1.4)*dt);m.lit=.15}}
   for(const j of G.shots||[])if(L.some(a=>Math.abs(wrap(j.a-a))<.25))j.d=Math.min(j.d0,j.d+3*dt)}
 function drawLamp(){if(!G.lamp)return;const r=Math.max(W,H)*.55,g=ctx.createRadialGradient(W/2,H/2,0,W/2,H/2,r);
-  g.addColorStop(0,'rgba(255,250,210,.34)');g.addColorStop(.35,'rgba(255,245,200,.16)');g.addColorStop(1,'rgba(255,245,200,0)');ctx.fillStyle=g;ctx.fillRect(0,0,W,H)}
+  g.addColorStop(0,'rgba(255,250,215,.55)');g.addColorStop(.4,'rgba(255,245,200,.25)');g.addColorStop(1,'rgba(255,245,200,0)');ctx.fillStyle=g;ctx.fillRect(0,0,W,H)}
 /* Vật gợi nhớ: chĩa camera vào đồ thật cùng màu để mảnh ký ức hiện rõ */
 const QC={red:{n:'ĐỎ',sw:'#e8455a',ok:h=>h>=340||h<=15},yellow:{n:'VÀNG',sw:'#ffd43a',ok:h=>h>=40&&h<=68},green:{n:'XANH LÁ',sw:'#5ccf4a',ok:h=>h>=80&&h<=160},blue:{n:'XANH DƯƠNG',sw:'#3a8bff',ok:h=>h>=190&&h<=250}};
 const MEMCOL=[['green','yellow','red','blue','red'],['blue','red','yellow','red','green'],['blue','blue','yellow','red','yellow'],['yellow','red','green','blue','green']];
@@ -1078,6 +1095,7 @@ async function prepare(){
       .then(st=>{vid.srcObject=st;return vid.play()}).then(()=>{S.cam=true;document.body.classList.remove('nocam')}).catch(()=>{});
     await Promise.race([camP,new Promise(r=>setTimeout(r,6000))]);
   }
+  if(S.cam&&!TORCH.probed)await Promise.race([torchProbe(),new Promise(r=>setTimeout(r,7000))]);
 }
 async function begin(){$('startBtn').disabled=true;netReset();await prepare();$('startBtn').disabled=false;
   let seen=false;try{seen=localStorage.getItem('thachma-intro')==='1'}catch(e){}
