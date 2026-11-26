@@ -91,7 +91,25 @@ h1{font:400 clamp(44px,13vw,72px)/1 "Rubik Wet Paint",cursive;color:var(--goo);m
 .note{font-size:13px;color:#b9a6dc;max-width:30em;margin:0}
 .big{font:800 46px/1 "Baloo 2",sans-serif;color:#ffcf3a}
 #hint{position:fixed;left:50%;transform:translateX(-50%);top:calc(max(10px,env(safe-area-inset-top)) + 46px);background:#000a;border-radius:14px;padding:6px 12px;font-size:14px;pointer-events:none;display:none;max-width:90%;text-align:center}
-@media(prefers-reduced-motion:reduce){#msg{transition:none}}
+#talk{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(max(14px,env(safe-area-inset-bottom)) + 124px);width:min(92vw,380px);display:grid;grid-template-columns:42px minmax(0,1fr);gap:10px;align-items:start;background:#14061fe8;border:2px solid #ffffff2a;border-radius:16px;padding:8px 12px;pointer-events:none;opacity:0;transition:opacity .25s;z-index:5;text-align:left}
+#talk.on{opacity:1}
+#talk .av{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;font:800 18px "Baloo 2",sans-serif;color:#14061f}
+#talk b{display:block;font-size:13px;color:#cbb8ee}#talk p{margin:0;font-size:15px;line-height:1.35}
+#talk.sms{border-color:#ff3d7f;background:#0a0410ee}#talk.sms p{font-family:ui-monospace,Menlo,monospace;color:#ffb3cf;letter-spacing:.02em}
+#story,#album{position:fixed;inset:0;z-index:7;background:radial-gradient(120% 80% at 50% 100%,#4a1a2a 0%,#14061f 65%);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:max(24px,env(safe-area-inset-top)) 22px 28px;text-align:center}
+#story[hidden],#album[hidden]{display:none}
+#storyText{max-width:26em;min-height:7.5em;font-size:19px;line-height:1.5;color:#fff7e6;margin:0}
+#storyText span{display:block;animation:fadein .6s both}
+@keyframes fadein{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+#story .row,#start .row2{display:flex;gap:10px;justify-content:center;width:100%;max-width:340px}#start .row2>*{flex:1;padding:8px 6px;font-size:16px;white-space:nowrap}
+#album{justify-content:flex-start;overflow:auto;background:#14061f}
+#album h2{font:400 clamp(30px,9vw,44px)/1 "Rubik Wet Paint",cursive;color:#ffcf3a;margin:8px 0 0}
+.mset{width:100%;max-width:380px;background:#ffffff0d;border:2px solid #ffffff1a;border-radius:18px;padding:10px 12px;text-align:left}
+.mset h3{margin:0 0 6px;font-size:16px;display:flex;justify-content:space-between}.mset h3 small{color:#cbb8ee;font-weight:600}
+.mset ul{list-style:none;margin:0;padding:0;display:grid;gap:5px}
+.mset li{font-size:14px;color:#e9dcff;background:#ffffff0a;border-radius:10px;padding:5px 9px}.mset li b{color:#ffcf3a}
+.mset li.no{color:#6f5a91}.mset .unl{margin:8px 0 0;font-size:14px;color:#9cff3c}
+@media(prefers-reduced-motion:reduce){#msg,#talk{transition:none}#storyText span{animation:none}}
 </style>
 </head>
 <body class="nocam">
@@ -137,17 +155,28 @@ h1{font:400 clamp(44px,13vw,72px)/1 "Rubik Wet Paint",cursive;color:var(--goo);m
   <div class="rcards" id="rcards"></div>
 </div>
 <div id="msg"></div>
+<div id="talk" aria-live="polite"><div class="av" id="talkAv"></div><div><b id="talkWho"></b><p id="talkText"></p></div></div>
+<div id="story" hidden>
+  <p id="storyText"></p>
+  <div class="row"><button class="go2" id="storySkip">Bỏ qua</button><button class="go" id="storyNext">Tiếp</button></div>
+</div>
+<div id="album" hidden>
+  <h2>Sổ ký ức</h2>
+  <p class="note">Quái vàng và trùm đôi khi rơi ra mảnh ký ức của đêm Rằm 20 năm trước. Gom đủ một bộ để mở lại chuyện cũ.</p>
+  <div id="mlist" style="display:grid;gap:10px;width:100%;justify-items:center"></div>
+  <button class="go" id="albumClose">Đóng</button>
+</div>
 
 <div class="screen" id="start">
   <h1>Đêm Thạch Ma</h1>
-  <p class="lead">Lũ quái nhầy nhụa đang bò tới từ phía trước. Giơ điện thoại lên làm ống ngắm, xoay máy để nhắm, giữ chân chúng qua 5 đợt.</p>
+  <p class="lead">Hẻm Đèn, đêm 14 tháng Tám. Điện vừa cúp, và từ xưởng kẹo bỏ hoang cuối hẻm, lũ quái thạch đang bò ra. Giơ điện thoại lên làm ống ngắm, giữ hàng rào đèn lồng qua 5 đợt.</p>
   <div class="roster">
     <div class="card"><canvas data-t="jelly"></canvas><b>Thạch Ma</b><span>Chậm, 2 phát</span></div>
     <div class="card"><canvas data-t="sock"></canvas><b>Tất Nhảy</b><span>Nhanh, lạng lách</span></div>
     <div class="card"><canvas data-t="box"></canvas><b>Hộp Quà Cắn</b><span>Trâu, đợt 4 và 5</span></div>
   </div>
   <button class="go" id="startBtn">Chơi một mình</button>
-  <button class="go2" id="setBtn">Cài đặt</button>
+  <div class="row2"><button class="go2" id="storyBtn">Cốt truyện</button><button class="go2" id="albumBtn">Sổ ký ức</button><button class="go2" id="setBtn">Cài đặt</button></div>
   <div class="mp">
     <b>Chơi cùng bạn (2–3 người)</b>
     <div class="row"><button class="go2" id="hostBtn">Tạo phòng</button></div>
@@ -248,6 +277,8 @@ const sfx={
   boom(){if(!AC)return;noise(1.2,'lowpass',600,1);tone('sine',80,25,.9,1)},
   freeze(){if(!AC)return;const t=AC.currentTime;[0,.08,.16,.24].forEach((d,i)=>tone('triangle',1200+i*400,2400+i*300,.4,.15,0,t+d))},
   click(){if(!AC)return;tone('square',1800,1500,.03,.15)},
+  sms(){if(!AC)return;const t=AC.currentTime;tone('square',1320,1320,.07,.12,0,t);tone('square',1760,1760,.07,.12,0,t+.11);noise(.25,'highpass',4000,.08,0,1,t+.2)},
+  mem(){if(!AC)return;const t=AC.currentTime;[0,.1,.2].forEach((d,i)=>tone('sine',880*[1,1.25,1.5][i],880*[1,1.25,1.5][i],.5,.18,0,t+d))},
   reload(){if(!AC)return;const t=AC.currentTime;noise(.05,'bandpass',2500,.4,0,4,t);noise(.05,'bandpass',1800,.4,0,4,t+.55);noise(.07,'bandpass',3000,.5,0,4,t+1.2)},
   splat(pan){if(!AC)return;noise(.18,'bandpass',700,.7,pan,2);tone('sine',300,90,.15,.3,pan)},
   hurt(pan){if(!AC)return;noise(.4,'lowpass',500,1,pan);tone('sawtooth',220,60,.4,.4,pan)},
@@ -474,10 +505,10 @@ function onGuestData(d){
     G.mons=d.m.map(([id,type,a,dd,hp,spd,ph,sc,gold,mx])=>{const o=old.get(id)||{hit:0,groan:rnd(.5,3),box:null};return Object.assign(o,{id,type,T:TYPES[type],a,d:dd,hp,spd,ph,sc,gold:!!gold,mx,open:type==='boss'&&!!d.bo})});
     G.endless=!!d.en;G.shots=(d.pj||[]).map(([id,a,dd,d0])=>({id,a,d:dd,d0}));hud();
   }else if(d.t==='wave'){G.wave=d.n;G.mod=d.mod;waveBanner(d.n);hud()}
-  else if(d.t==='kill'){const m=G.mons.find(x=>x.id===d.id);if(m){const p=proj(m.a,m.d,m.T.h*.6);if(p)goo(p.x,p.y,m.type,22);G.mons.splice(G.mons.indexOf(m),1)}}
+  else if(d.t==='kill'){const m=G.mons.find(x=>x.id===d.id);if(m){const p=proj(m.a,m.d,m.T.h*.6);if(p)goo(p.x,p.y,m.type,22);if(m.type==='boss')bossDown(m);G.mons.splice(G.mons.indexOf(m),1)}}
   else if(d.t==='ammo'){G.res+=d.n;G.pops.push({x:W/2,y:H/2+30,t:0,s:'+'+d.n+' đạn',c:'#ffcf3a'});hud()}
   else if(d.t==='hurt'){hurtFx(d.a)}
-  else if(d.t==='clear'){G.calm=9;G.res+=24;hud();banner('Đã giữ được!','+24 đạn, +10 máu');showReward()}
+  else if(d.t==='clear'){G.calm=9;G.res+=24;hud();banner('Đã giữ được!','+24 đạn, +10 máu');storyClear(G.wave);showReward()}
   else if(d.t==='rage'){banner('Đại Pudding nổi giận!','Bắn vào lõi hồng khi nó há miệng');G.shake=.8;sfx.boom()}
   else if(d.t==='mykill'){G.killMark=.25;bumpCombo(d.gold)}
   else if(d.t==='freeze'){G.freeze=d.s;sfx.freeze()}
@@ -543,7 +574,7 @@ function swapGun(){if(S.mode!=='play')return;const ks=Object.keys(WEAPONS).filte
 let G;
 function reset(){
   G={hp:100,score:0,wave:0,guns:{pistol:{mag:8}},gun:'pistol',up:{},items:{},combo:0,cd:0,freeze:0,firing:false,res:32,reload:0,mons:[],queue:[],spawnT:0,breakT:0,shake:0,hurt:0,hurtDir:0,flash:0,recoil:0,parts:[],pops:[],heartT:0,t:0,kills:0};
-  G.players=NET.role==='host'?NET.conns.length+1:NET.count;G.diff=SET.diff;G.res=Math.round(32*DIFF[SET.diff].ammo);G.runId=Date.now()+'-'+Math.random().toString(36).slice(2,6);G.shots=[];G.endless=false;G.mod=null;G.calm=0;MUS.won=false;
+  G.players=NET.role==='host'?NET.conns.length+1:NET.count;G.diff=SET.diff;G.res=Math.round(32*DIFF[SET.diff].ammo);G.runId=Date.now()+'-'+Math.random().toString(36).slice(2,6);G.shots=[];G.endless=false;G.mod=null;G.calm=0;MUS.won=false;G.memNew=0;G.outro=null;G.core=null;talkClear();
   if(NET.role!=='guest')startWave(1);hud();
 }
 const MODS=[
@@ -568,7 +599,7 @@ function startWave(n){
   q.sort(()=>Math.random()-.5);G.queue=q;G.spawnT=2.2;
   waveBanner(n);bcast({t:'wave',n,mod:G.mod});
 }
-function waveBanner(n){const M=MODS.find(m=>m.id===G.mod);if(isBoss(n)){banner('TRÙM: Đại Pudding','Bắn quả anh đào trên đỉnh, chặn thạch nó ném'+(M?' · '+M.name:''));return}banner('Đợt '+n,M?M.name+': '+M.desc:'Chúng đang tới từ phía trước')}
+function waveBanner(n){storyWave(n);const M=MODS.find(m=>m.id===G.mod);if(isBoss(n)){banner('TRÙM: Đại Pudding','Bắn quả anh đào trên đỉnh, chặn thạch nó ném'+(M?' · '+M.name:''));return}banner('Đợt '+n,M?M.name+': '+M.desc:'Chúng đang tới từ phía trước')}
 function spawn(type){
   const T=TYPES[type],md=G.mod;let a;G.nSp++;
   if(G.pattern==='flank'){G.flip=!G.flip;a=(G.flip?1:-1)*rnd(.55,.95)*ARC}
@@ -618,14 +649,14 @@ function shoot(){
 }
 function popShot(id){const j=(G.shots||[]).find(x=>x.id===id);if(!j)return;G.shots.splice(G.shots.indexOf(j),1);G.score+=5;bcast(snap())}
 function bumpCombo(gold){
-  G.combo++;if(gold)addItem(Object.keys(ITEMS)[Math.floor(Math.random()*3)],'Quái vàng');
+  G.combo++;if(gold)gainMem(false);if(gold)addItem(Object.keys(ITEMS)[Math.floor(Math.random()*3)],'Quái vàng');
   if(G.combo>0&&G.combo%8===0){addItem(Object.keys(ITEMS)[Math.floor(Math.random()*3)],'Chuỗi '+G.combo);sfx.reload()}
   hud();
 }
 function applyHit(m,dmg,head,from){
   m.hp-=dmg;if(m.hp>0)return false;
   const i=G.mons.indexOf(m);if(i<0)return false;
-  G.mons.splice(i,1);G.kills++;G.score+=Math.round((m.T.pts*(head?2:1)+(m.gold?50:0))*(mod()==='blood'?2:1)*(1+Math.min(G.combo,10)*.1));bcast({t:'kill',id:m.id});if(from){try{from.send({t:'mykill',gold:m.gold})}catch(e){}}
+  G.mons.splice(i,1);G.kills++;if(m.type==='boss')bossDown(m);G.score+=Math.round((m.T.pts*(head?2:1)+(m.gold?50:0))*(mod()==='blood'?2:1)*(1+Math.min(G.combo,10)*.1));bcast({t:'kill',id:m.id});if(from){try{from.send({t:'mykill',gold:m.gold})}catch(e){}}
   if(m.gold||Math.random()<(mod()==='gift'?.6:.3)){const n=m.gold?10:m.type==='box'?8:4;
     if(from){try{from.send({t:'ammo',n})}catch(e){}}else{G.res+=n;G.pops.push({x:W/2,y:H/2+30,t:0,s:'+'+n+' đạn',c:'#ffcf3a'})}}
   if(from){const p=proj(m.a,m.d,m.T.h*.6);if(p)goo(p.x,p.y,m.type,22)}
@@ -761,7 +792,7 @@ function drawOverlay(dt){
   G.parts=G.parts.filter(p=>p.t<.7);for(const p of G.parts){ctx.globalAlpha=1-p.t/.7;ctx.fillStyle=p.c;ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,7);ctx.fill()}ctx.globalAlpha=1;
   for(const p of G.pops){p.t+=dt;p.y-=40*dt}G.pops=G.pops.filter(p=>p.t<1);
   ctx.font='800 22px "Baloo 2",sans-serif';ctx.textAlign='center';for(const p of G.pops){ctx.globalAlpha=1-p.t;ctx.fillStyle='#000';ctx.fillText(p.s,p.x+2,p.y+2);ctx.fillStyle=p.c||'#9cff3c';ctx.fillText(p.s,p.x,p.y)}ctx.globalAlpha=1;
-  drawReticle(dt);
+  drawCore(dt);drawReticle(dt);
   if(G.flash>0){ctx.fillStyle='rgba(255,240,200,'+G.flash*5+')';ctx.fillRect(0,0,W,H)}
 }
 
@@ -769,7 +800,7 @@ function drawOverlay(dt){
 let last=performance.now();
 function loop(now){
   const dt=Math.min(.05,(now-last)/1000);last=now;
-  if(S.mode==='play'&&!S.paused)step(dt);
+  if(S.mode==='play'&&!S.paused){step(dt);talkTick(dt)}
   S.yaw+=wrap(S.tYaw-S.yaw)*(S.gyro?.45:.6);S.pitch+=(S.tPitch-S.pitch)*(S.gyro?.45:.6);
   if(S.mode!=='start'){
     ctx.save();ctx.clearRect(0,0,W,H);
@@ -808,8 +839,8 @@ function step(dt){
   if(nearest<7&&(G.heartT-=dt)<=0){sfx.heart();G.heartT=.45+nearest*.08}
   if(!G.queue.length&&!G.mons.length){
     G.shots=[];
-    if(G.wave>=WAVES&&!G.endless){end(true);return}
-    G.breakT=9;G.calm=9;G.res+=Math.round(24*DF().ammo);G.hp=Math.min(100,G.hp+10);hud();banner('Đã giữ được!','+24 đạn, +10 máu');bcast({t:'clear'});bcast(snap());showReward()
+    if(G.wave>=WAVES&&!G.endless){if(G.outro==null){G.outro=7;bcast({t:'outro'})}if((G.outro-=dt)<=0)end(true);return}
+    G.breakT=9;G.calm=9;G.res+=Math.round(24*DF().ammo);G.hp=Math.min(100,G.hp+10);hud();banner('Đã giữ được!','+24 đạn, +10 máu');storyClear(G.wave);bcast({t:'clear'});bcast(snap());showReward()
   }
 }
 function bossStep(m,dt){
@@ -831,6 +862,94 @@ function guestStep(dt){
   }
   if(nearest<7&&(G.heartT-=dt)<=0){sfx.heart();G.heartT=.45+nearest*.08}
 }
+/* ---------- cốt truyện: Đêm 1, Hẻm Đèn ---------- */
+const WHO={ut:{n:'Bà Út',c:'#ffcf3a',i:'Ú'},na:{n:'Bé Na',c:'#5ee0ff',i:'N'},t:{n:'Tin nhắn lạ · T.',c:'#ff3d7f',i:'T'}};
+const INTRO=['Hẻm Đèn, đêm 14 tháng Tám.','Bạn về đây ăn Tết Trung Thu ở nhà người quen. Điện cả hẻm vừa cúp.','Chỉ còn tiệm đèn lồng của Bà Út ở đầu hẻm là sáng.','Từ cuối hẻm, chỗ xưởng kẹo bỏ hoang 20 năm, có thứ gì hồng hồng, nhầy nhầy đang bò ra.','Bà Út dúi vào tay bạn một khẩu súng đồ chơi bắn ánh trăng. “Giữ hàng rào đèn lồng. Đừng để chúng vào hẻm.”'];
+const MEMSETS=[
+  {n:'Ngày vui ở hẻm',u:'Hẻm Đèn từng là nơi vui nhất thị trấn mỗi mùa Trung Thu, nhờ xưởng kẹo của ông Tám Đường.',m:[
+    ['Mẻ thạch đầu tiên','Ông Tám cầm muôi, Bà Út còn trẻ măng, cười ngặt nghẽo vì mẻ thạch bị khét.'],
+    ['Đường phơi trăng','Những khay nước đường xếp kín mái xưởng, chờ trăng Rằm soi vào.'],
+    ['Kẹo ký ức','Một bà cụ ăn viên kẹo rồi khóc: bà nhớ ra rõ mồn một ngày cưới của mình.'],
+    ['Tất treo cửa','Bọn trẻ trong hẻm treo tất ngoài cửa, mong ông Tám thả kẹo vào.'],
+    ['Hộp quà nơ đỏ','Hộp kẹo Trung Thu gói nơ đỏ. Nhà nào trong hẻm cũng từng được tặng một hộp.']]},
+  {n:'Người từ thành phố',u:'Lý Sương không đến để phá. Ông đến vì vợ ông yêu nơi này. Rồi bà đổ bệnh.',m:[
+    ['Chiếc xe màu bạc','Một chiếc xe bạc dừng ở đầu hẻm. Người đàn ông đeo kính bạc bước xuống.'],
+    ['Bà Sương','Vợ ông Lý Sương mê đèn lồng, mua hết cả một gian hàng của Bà Út.'],
+    ['Cái bắt tay','Ông Tám và Lý Sương bắt tay nhau. Xưởng có tiền sửa lại mái.'],
+    ['Đèn cá chép','Bà Sương tự tay làm một chiếc đèn cá chép, treo trước cửa xưởng.'],
+    ['Mùa thu năm ấy','Bà Sương ốm nặng. Từ đó Lý Sương hiếm khi cười.']]},
+  {n:'Căn hầm',u:'Bà Út biết về cái lò dưới hầm. Bà đã chọn im lặng vì món nợ của xưởng.',m:[
+    ['Tiếng máy lúc nửa đêm','Bà Út nghe tiếng máy chạy dưới hầm xưởng, lúc nửa đêm.'],
+    ['Bản vẽ','Bản vẽ một cái lò tròn, hàng chục ống dẫn chĩa thẳng lên trời.'],
+    ['Lời hứa','“Chạy thử một đêm thôi, tôi sẽ trả hết nợ cho xưởng.” Bà Út gật đầu.'],
+    ['Hộp kẹo trống','Những hộp kẹo xếp sẵn, nhãn ghi: “Kỷ niệm đẹp. Giá cao.”'],
+    ['Chìa khóa','Bà Út giấu chìa khóa hầm dưới chiếc đèn lồng cũ nhất tiệm.']]},
+  {n:'Đêm Rằm',u:'Đêm Rằm ấy, cả hẻm mất ký ức cùng một lúc. Chỉ người đứng xa cái lò mới còn nhớ.',m:[
+    ['Đứa trẻ cầm đèn','Một bé trai cầm đèn ông sao, thấy mặt trăng bỗng chuyển sang màu hồng.'],
+    ['Người bán bánh','Bác bán bánh nướng nghe một tiếng “ục” rất to vọng lên từ dưới đất.'],
+    ['Ông Tám chạy','Ông Tám chạy ngược dòng người đang rước đèn, lao về phía xưởng.'],
+    ['Kho đường','Bà Út đứng trong kho đường, thấy sương hồng tràn qua khe cửa rồi dừng lại.'],
+    ['Lý Sương','Lý Sương đứng giữa màn sương, gọi tên vợ, nhưng không nhớ ra cái tên ấy.']]},
+  {n:'Khuôn mặt (hiếm)',u:'Bạn giữ thứ mà Lý Sương đã tìm suốt 20 năm. Ở đêm cuối, nó sẽ mở ra một lựa chọn khác.',m:[
+    ['Khuôn mặt','Bà Sương cười dưới chiếc đèn cá chép. Lý Sương đã quên khuôn mặt này 20 năm.']]}];
+const MEMALL=MEMSETS.flatMap((st,si)=>st.m.map((x,i)=>({id:si+'-'+i,si,t:x[0],d:x[1]})));
+const memGet=()=>{try{return JSON.parse(localStorage.getItem('thachma-mem')||'[]')}catch(e){return[]}};
+function gainMem(boss){
+  const have=memGet(),face='4-0',dDone=MEMSETS[3].m.every((_,i)=>have.includes('3-'+i));
+  let pool=MEMALL.filter(m=>m.si<4&&!have.includes(m.id)),pick=null;
+  if(boss&&!have.includes(face)&&dDone&&Math.random()<.35)pick=MEMALL.find(m=>m.id===face);
+  else if(pool.length)pick=pool[Math.floor(Math.random()*pool.length)];
+  if(!pick)return;have.push(pick.id);try{localStorage.setItem('thachma-mem',JSON.stringify(have))}catch(e){}
+  G.memNew=(G.memNew||0)+1;G.pops.push({x:W/2,y:H/2-70,t:0,s:'Mảnh ký ức: '+pick.t,c:'#ffb3cf'});
+  hint('Nhặt được mảnh ký ức “'+pick.t+'”. Xem trong Sổ ký ức',2.6);sfx.mem();
+  const st=MEMSETS[pick.si];if(st.m.every((_,i)=>have.includes(pick.si+'-'+i)))say('ut','…'+st.u,6);
+}
+function album(){const have=memGet(),L=$('mlist');L.innerHTML='';
+  MEMSETS.forEach((st,si)=>{if(si===4&&!have.includes('4-0'))return;const box=document.createElement('div'),h=document.createElement('h3'),sm=document.createElement('small'),ul=document.createElement('ul');box.className='mset';
+    const got=st.m.filter((_,i)=>have.includes(si+'-'+i)).length;h.append(st.n);sm.textContent=got+'/'+st.m.length;h.append(sm);box.append(h,ul);
+    st.m.forEach((x,i)=>{const li=document.createElement('li');if(have.includes(si+'-'+i)){const b=document.createElement('b');b.textContent=x[0]+': ';li.append(b,x[1])}else{li.className='no';li.textContent='??? (chưa tìm thấy)'}ul.append(li)});
+    if(got===st.m.length){const u=document.createElement('p');u.className='unl';u.textContent=st.u;box.append(u)}L.append(box)});
+  $('album').hidden=false}
+let TQ=[],talkT=0,talkWait=0;
+function say(who,text,dur=4.5,wait=0){TQ.push({who,text,dur,wait,born:G?G.t:0})}
+function talkTick(dt){
+  if(talkT>0){if((talkT-=dt)<=0)$('talk').classList.remove('on');return}
+  while(TQ.length>1&&G&&G.t-TQ[0].born>14)TQ.shift();
+  if(!TQ.length)return;const q=TQ[0];if((q.wait-=dt)>0)return;TQ.shift();
+  const w=WHO[q.who];$('talkAv').textContent=w.i;$('talkAv').style.background=w.c;$('talkWho').textContent=w.n;$('talkText').textContent=q.text;
+  $('talk').classList.toggle('sms',q.who==='t');$('talk').classList.add('on');talkT=q.dur;if(q.who==='t'){sfx.sms();vib([30,40,30])}
+}
+function talkClear(){TQ=[];talkT=0;$('talk').classList.remove('on')}
+const UT_IDLE=['Đèn nhà ông Bảy vừa sáng lại kìa. Chắc là nhờ con đó.','Ráng lên, trời sắp sáng rồi… chắc vậy.','Bà pha ấm trà gừng đây. Bắn tiếp đi, bà để phần.','Mấy đốm sáng đó bay về nhà ai, nhà đó nhớ lại được một chút.','Hồi xưa đêm Rằm hẻm này đông vui lắm. Hồi xưa thôi.'];
+function storyWave(n){
+  if(G.endless){if(isBoss(n))say('ut','Nó lại về rồi! Bắn quả anh đào trên đỉnh!',4,1.5);return}
+  if(n===1)say('ut','Ê, đứa nhỏ! Cái gì hồng hồng bò tới thì bắn thẳng vào. Đừng hỏi.',5,2.4);
+  if(n===3&&(G.players||1)>1)say('na','Con tất sọc vằn kia tên là Bác Tất. Con đặt đó.',4,2.4);
+  if(n===4)say('ut','Hộp quà nơ đỏ kia… hồi xưa hẻm này cũng gói quà y như vậy. Thôi, bắn tiếp đi.',5,2.6);
+  if(n===WAVES)say('ut','Trời đất ơi. Cái nồi thạch Rằm…',4,2.6);
+}
+function storyClear(n){
+  if(G.endless){if(Math.random()<.45)say('ut',UT_IDLE[Math.floor(Math.random()*UT_IDLE.length)],4.5,1);return}
+  if(n===1)say('ut','Giỏi. Hàng rào đèn lồng mà vỡ là cả hẻm quên luôn bữa cơm tối đấy.',4.5,1);
+  if(n===2)say('t','chúng không phải quái. chúng là đêm rằm.',5,1.2);
+  if(n===3)say('ut','Lạ thật. Quái vỡ ra thành đốm sáng, bay về nhà người ta…',4.5,1);
+  if(n===4)say('t','cái lớn đang tới. nó đang giữ một thứ của tôi. bắn quả anh đào.',5.5,1.2);
+}
+function bossDown(m){
+  const p=proj(m.a,m.d,m.T.h*.55);G.core={x:p?p.x:W/2,y:p?p.y:H/3,t:0};gainMem(true);
+  if(!G.endless){talkClear();say('ut','Ông Tám…?',2.6,1.4);say('t','cảm ơn. hẹn đêm mai.',2.6,.2)}
+}
+function drawCore(dt){const c=G.core;if(!c)return;c.t+=dt;if(c.t>4){G.core=null;return}
+  const k=clamp((c.t-.5)/3,0,1),e=k*k,x=c.x+(W*.85-c.x)*e,y=c.y+(-60-c.y)*e+Math.sin(c.t*5)*12*(1-k),r=18*(1-.5*k)+6*Math.sin(c.t*9);
+  for(let i=5;i>0;i--){ctx.globalAlpha=.08*i*(1-k*.6);ctx.fillStyle='#ff7ab0';ctx.beginPath();ctx.arc(x-(x-c.x)*.04*i,y-(y-c.y)*.04*i+i*6,r*(1+i*.25),0,7);ctx.fill()}
+  ctx.globalAlpha=1;const g=ctx.createRadialGradient(x,y,0,x,y,r);g.addColorStop(0,'#fff');g.addColorStop(.5,'#ff9cc8');g.addColorStop(1,'#ff3d7f00');ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,r*1.4,0,7);ctx.fill()}
+let storyI=0,storyDone=null;
+function showStory(cb){storyI=0;storyDone=cb;$('storyText').innerHTML='';$('story').hidden=false;storyStep()}
+function storyStep(){if(storyI>=INTRO.length){storyEnd();return}const sp=document.createElement('span');sp.textContent=INTRO[storyI++];$('storyText').append(sp);while($('storyText').children.length>3)$('storyText').firstChild.remove();$('storyNext').textContent=storyI>=INTRO.length?'Giữ hàng rào!':'Tiếp'}
+function storyEnd(){$('story').hidden=true;try{localStorage.setItem('thachma-intro','1')}catch(e){}const f=storyDone;storyDone=null;f&&f()}
+$('storyNext').addEventListener('click',storyStep);$('storySkip').addEventListener('click',storyEnd);
+$('storyBtn').addEventListener('click',()=>showStory(null));
+$('albumBtn').addEventListener('click',album);$('albumClose').addEventListener('click',()=>{$('album').hidden=true});
 function saveScore(){let lb=[];try{lb=JSON.parse(localStorage.getItem('thachma-lb')||'[]')}catch(e){}
   lb=lb.filter(e=>e.id!==G.runId);lb.push({id:G.runId,s:G.score,w:G.wave,e:G.endless?1:0,d:Date.now()});lb.sort((a,b)=>b.s-a.s);lb=lb.slice(0,10);
   try{localStorage.setItem('thachma-lb',JSON.stringify(lb))}catch(e){}return lb}
@@ -843,13 +962,14 @@ function end(win,info){
   $('againBtn').textContent=NET.role==='guest'?'Rời phòng':NET.role==='host'?'Chơi lại cả phòng':'Chơi lại';
   $('againBtn').hidden=false;
   const team=NET.role!=='solo';
-  $('overTitle').textContent=win?(team?'Cả đội đã hạ trùm!':'Bạn đã hạ trùm!'):(team?'Cả đội đã gục!':'Bạn đã gục!');
-  $('overText').textContent=win?'Đại Pudding đã tan chảy. Hạ '+G.kills+' con. Chơi tiếp chế độ vô tận để leo bảng điểm?':'Gục ở đợt '+G.wave+(G.endless?' (vô tận)':'')+' sau khi hạ '+G.kills+' con.';
+  $('overTitle').textContent=win?'Hết Đêm 1':(team?'Cả đội đã gục!':'Bạn đã gục!');
+  talkClear();const mn=G.memNew?' Nhặt được '+G.memNew+' mảnh ký ức.':'';
+  $('overText').textContent=(win?'Lõi hồng của Đại Pudding bay về phía xưởng kẹo bỏ hoang. Bà Út đứng lặng rất lâu. Hẻm Đèn sáng lại từng nhà. Bạn hạ '+G.kills+' con.'+mn+' Còn tiếp: Đêm 2, Chợ đêm Trung Thu. Trong lúc chờ, giữ đèn tiếp ở chế độ vô tận nhé?':G.endless?'Hàng rào vỡ ở đợt '+G.wave+' (vô tận) sau khi hạ '+G.kills+' con.'+mn:'Hàng rào đèn lồng vỡ ở đợt '+G.wave+'. Sáng mai cả hẻm sẽ quên thêm một chút. Bạn hạ '+G.kills+' con.'+mn);
   $('overScore').textContent=G.score;
   const lb=saveScore();
   $('lb').innerHTML='';lb.forEach(e=>{const li=document.createElement('li'),sp=document.createElement('span'),b=document.createElement('b');const dt=new Date(e.d);sp.textContent='Đợt '+e.w+(e.e?' ∞':'')+' · '+dt.getDate()+'/'+(dt.getMonth()+1);b.textContent=e.s;li.append(sp,b);if(e.id===G.runId)li.className='me';$('lb').append(li)});
   $('contBtn').hidden=!(win&&!G.endless&&NET.role!=='guest');
-  $('best').textContent=NET.role==='guest'?(win?'Chờ chủ phòng chọn chơi tiếp hoặc chơi lại.':'Chờ chủ phòng bấm chơi lại, hoặc rời phòng.'):'Bảng 10 điểm cao trên máy này';
+  $('best').textContent=NET.role==='guest'?(win?'Chờ chủ phòng chọn chơi tiếp hoặc chơi lại.':'Chờ chủ phòng bấm chơi lại, hoặc rời phòng.'):'Sổ Gác Đèn: 10 lượt gác giỏi nhất trên máy này';
   $('over').classList.remove('hidden');vib(400);
 }
 
@@ -864,7 +984,9 @@ async function prepare(){
     await Promise.race([camP,new Promise(r=>setTimeout(r,6000))]);
   }
 }
-async function begin(){$('startBtn').disabled=true;netReset();await prepare();go();$('startBtn').disabled=false}
+async function begin(){$('startBtn').disabled=true;netReset();await prepare();$('startBtn').disabled=false;
+  let seen=false;try{seen=localStorage.getItem('thachma-intro')==='1'}catch(e){}
+  if(seen)go();else showStory(go)}
 function go(){
   S.yaw0=S.gyro?S.rawYaw:null;S.tYaw=S.yaw=0;S.tPitch=S.pitch=0;
   if(NET.role==='host')bcast({t:'start',n:NET.conns.length+1});
@@ -893,7 +1015,7 @@ function closeSet(){$('settings').hidden=true;S.paused=false}
 $('pauseBtn').addEventListener('pointerdown',e=>{e.stopPropagation();openSet()});
 $('setBtn').addEventListener('click',openSet);
 $('resumeBtn').addEventListener('click',closeSet);
-$('quitBtn').addEventListener('click',()=>{closeSet();if(G){G.firing=false}$('reward').hidden=true;rwT=0;netReset();S.mode='start';showScreen('start');$('bossbar').hidden=true});
+$('quitBtn').addEventListener('click',()=>{closeSet();talkClear();if(G){G.firing=false}$('reward').hidden=true;rwT=0;netReset();S.mode='start';showScreen('start');$('bossbar').hidden=true});
 [['sMv','mv'],['sSv','sv'],['sSens','sens']].forEach(([id,k])=>$(id).addEventListener('input',e=>{SET[k]=+e.target.value;saveSet()}));
 $('sVib').addEventListener('change',e=>{SET.vib=e.target.checked;saveSet();vib(40)});
 document.querySelectorAll('.seg button').forEach(b=>b.addEventListener('click',()=>{SET.diff=b.dataset.d;saveSet()}));
