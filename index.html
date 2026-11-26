@@ -159,7 +159,7 @@ addEventListener('pointerup',()=>{if(pd&&pd.m<12&&performance.now()-pd.t<350)sho
 /* ---------- âm thanh tự tạo ---------- */
 let AC=null,master=null,nbuf=null;
 function initAudio(){
-  try{AC=new(window.AudioContext||window.webkitAudioContext)();master=AC.createGain();master.gain.value=.9;master.connect(AC.destination);
+  try{AC=new(window.AudioContext||window.webkitAudioContext)();master=AC.createGain();master.gain.value=1;const comp=AC.createDynamicsCompressor();comp.threshold.value=-18;comp.ratio.value=4;master.connect(comp).connect(AC.destination);
     nbuf=AC.createBuffer(1,AC.sampleRate,AC.sampleRate);const c=nbuf.getChannelData(0);for(let i=0;i<c.length;i++)c[i]=Math.random()*2-1;
     AC.resume();ambient();musicStart();}catch(e){AC=null}
 }
@@ -191,6 +191,7 @@ function ambient(){const g=AC.createGain();g.gain.value=.035;g.connect(master);
 /* ---------- nhạc nền nguyên bản, soạn bằng mã ---------- */
 const MUS={on:true,step:0,next:0,timer:null,g:null,danger:false};
 try{MUS.on=localStorage.getItem('thachma-music')!=='0'}catch(e){}
+const mtof=m=>440*Math.pow(2,(m-69)/12);
 function note(type,m,t,dur,peak,dest){const o=AC.createOscillator();o.type=type;o.frequency.value=mtof(m);const g=AC.createGain();g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(peak,t+.01);g.gain.exponentialRampToValueAtTime(.0001,t+dur);o.connect(g).connect(dest);o.start(t);o.stop(t+dur+.05)}
 function drum(t,dest,kick){if(kick){const o=AC.createOscillator();o.frequency.setValueAtTime(130,t);o.frequency.exponentialRampToValueAtTime(42,t+.18);const g=AC.createGain();g.gain.setValueAtTime(.5,t);g.gain.exponentialRampToValueAtTime(.0001,t+.22);o.connect(g).connect(dest);o.start(t);o.stop(t+.25)}
   else{const n=AC.createBufferSource();n.buffer=nbuf;const f=AC.createBiquadFilter();f.type='highpass';f.frequency.value=7000;const g=AC.createGain();g.gain.setValueAtTime(.12,t);g.gain.exponentialRampToValueAtTime(.0001,t+.05);n.connect(f).connect(g).connect(dest);n.start(t,Math.random()*.5);n.stop(t+.06)}}
@@ -206,10 +207,10 @@ function buildS5(){const ev=[];let s=0;
   mot(67,63,16,36);mot(65,62,16,31);mot(79,75,8,36);mot(77,74,16,31);
   return{len:s,ev}}
 function buildMoon(){const ev=[];const bars=[
-  {up:[49,56,61,64,68,73,76,80,85,88,92,97].map(n=>n-12),st:[61,64,68],b:25},
-  {up:[49,56,61,64,68,73,76,80,85,88,92,97].map(n=>n-12),st:[61,64,68],b:25},
-  {up:[48,51,54,56,60,63,66,68,72,75,78,80].map(n=>n-12),st:[60,63,66],b:32},
-  {up:[49,56,61,64,68,73,76,80,85,88,92,97].map(n=>n-12),st:[61,64,68],b:25}];
+  {up:[49,56,61,64,68,73,76,80,85,88,92,97],st:[61,64,68],b:25},
+  {up:[49,56,61,64,68,73,76,80,85,88,92,97],st:[61,64,68],b:25},
+  {up:[48,51,54,56,60,63,66,68,72,75,78,80],st:[60,63,66],b:32},
+  {up:[49,56,61,64,68,73,76,80,85,88,92,97],st:[61,64,68],b:25}];
   bars.forEach((B,i)=>{const o=i*16;B.up.forEach((n,k)=>ev.push([o+k,'p',n,.9]));[12,14].forEach(k=>{B.st.forEach(n=>ev.push([o+k,'c',n,1.5]));ev.push([o+k,'b',B.b,1.5],[o+k,'k'])})});
   return{len:64,ev}}
 const SONGS={s5:buildS5(),moon:buildMoon()};
@@ -217,10 +218,10 @@ for(const k in SONGS){const S_=SONGS[k];S_.at=Array.from({length:S_.len},()=>[])
 MUS.song='s5';
 function playStep(s,t,sp){const d=MUS.g,song=SONGS[MUS.song];
   for(const e of song.at[s]){const [,k,n,l]=e;
-    if(k==='m'){voice('sawtooth',n,t,l*sp,.09,1800,d);voice('sawtooth',n-12,t,l*sp,.07,1200,d)}
-    else if(k==='b')voice('sawtooth',n,t,l*sp,.12,500,d);
-    else if(k==='p')note('triangle',n,t,.25,.11,d);
-    else if(k==='c')voice('square',n,t,l*sp,.05,1600,d);
+    if(k==='m'){voice('sawtooth',n,t,l*sp,.2,2600,d);voice('square',n+12,t,l*sp,.06,3000,d);voice('sawtooth',n-12,t,l*sp,.12,1400,d)}
+    else if(k==='b'){voice('sawtooth',n+12,t,l*sp,.16,900,d);voice('sawtooth',n+24,t,l*sp,.08,1200,d)}
+    else if(k==='p'){note('triangle',n,t,.3,.26,d);note('sine',n+12,t,.15,.08,d)}
+    else if(k==='c')voice('square',n,t,l*sp,.1,2200,d);
     else if(k==='k')drum(t,d,true)}
   if(MUS.song==='s5'&&s%4===2)drum(t,d,false)}
 function musicTick(){if(!AC)return;
@@ -229,8 +230,11 @@ function musicTick(){if(!AC)return;
   while(MUS.next<AC.currentTime+.15){
     if(want!==MUS.song&&MUS.step%16===0){MUS.song=want;MUS.step=0}
     playStep(MUS.step,MUS.next,sp);MUS.next+=sp;MUS.step=(MUS.step+1)%SONGS[MUS.song].len}}
-function musicStart(){if(!AC||MUS.timer)return;MUS.g=AC.createGain();MUS.g.gain.value=MUS.on?.45:0;MUS.g.connect(master);MUS.next=AC.currentTime+.1;MUS.timer=setInterval(musicTick,25)}
-function musicSet(on){MUS.on=on;try{localStorage.setItem('thachma-music',on?'1':'0')}catch(e){}if(MUS.g)MUS.g.gain.setTargetAtTime(on?.45:0,AC.currentTime,.1);$('music').textContent=on?'Nhạc: bật':'Nhạc: tắt'}
+function musicStart(){if(!AC||MUS.timer)return;MUS.g=AC.createGain();MUS.g.gain.value=MUS.on?.9:0;MUS.g.connect(master);MUS.next=AC.currentTime+.1;MUS.timer=setInterval(musicTick,25)}
+function musicSet(on){MUS.on=on;wake&&wake();try{localStorage.setItem('thachma-music',on?'1':'0')}catch(e){}if(MUS.g)MUS.g.gain.setTargetAtTime(on?.9:0,AC.currentTime,.1);$('music').textContent=on?'Nhạc: bật':'Nhạc: tắt'}
+const wake=()=>{if(AC&&AC.state!=='running')AC.resume().catch(()=>{})};
+['pointerdown','touchstart','click'].forEach(ev=>addEventListener(ev,wake,{capture:true,passive:true}));
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)wake()});
 const vib=p=>{try{navigator.vibrate&&navigator.vibrate(p)}catch(e){}};
 
 /* ---------- quái vật (thiết kế nguyên bản, vẽ bằng mã) ---------- */
