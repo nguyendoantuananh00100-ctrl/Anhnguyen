@@ -191,20 +191,44 @@ function ambient(){const g=AC.createGain();g.gain.value=.035;g.connect(master);
 /* ---------- nhạc nền nguyên bản, soạn bằng mã ---------- */
 const MUS={on:true,step:0,next:0,timer:null,g:null,danger:false};
 try{MUS.on=localStorage.getItem('thachma-music')!=='0'}catch(e){}
-const BASS=[45,0,45,52,48,0,45,0,43,0,43,50,44,0,40,0];
-const MEL=[69,0,72,0,76,0,75,0,76,0,0,72,71,0,68,0,69,0,72,0,76,0,79,0,78,0,75,0,76,0,0,0];
-const mtof=m=>440*Math.pow(2,(m-69)/12);
 function note(type,m,t,dur,peak,dest){const o=AC.createOscillator();o.type=type;o.frequency.value=mtof(m);const g=AC.createGain();g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(peak,t+.01);g.gain.exponentialRampToValueAtTime(.0001,t+dur);o.connect(g).connect(dest);o.start(t);o.stop(t+dur+.05)}
 function drum(t,dest,kick){if(kick){const o=AC.createOscillator();o.frequency.setValueAtTime(130,t);o.frequency.exponentialRampToValueAtTime(42,t+.18);const g=AC.createGain();g.gain.setValueAtTime(.5,t);g.gain.exponentialRampToValueAtTime(.0001,t+.22);o.connect(g).connect(dest);o.start(t);o.stop(t+.25)}
   else{const n=AC.createBufferSource();n.buffer=nbuf;const f=AC.createBiquadFilter();f.type='highpass';f.frequency.value=7000;const g=AC.createGain();g.gain.setValueAtTime(.12,t);g.gain.exponentialRampToValueAtTime(.0001,t+.05);n.connect(f).connect(g).connect(dest);n.start(t,Math.random()*.5);n.stop(t+.06)}}
-function playStep(s,t){const d=MUS.g,b=BASS[s%16];
-  if(b)note('triangle',b,t,.28,.32,d);
-  const m=MEL[s];if(m){note('sine',m,t,.7,.1,d);note('sine',m+12,t,.35,.035,d)}
-  if(s%8===0)drum(t,d,true);if(s%4===2)drum(t,d,false);
-  if(MUS.danger){if(s%2)note('sawtooth',57+(s%4===1?0:1),t,.09,.05,d);if(s%8===4)drum(t,d,true)}}
-function musicTick(){if(!AC)return;const bpm=92+((G&&G.wave)||0)*6+(MUS.danger?16:0),sp=60/bpm/4;
+function voice(type,m,t,dur,peak,cut,dest){const o=AC.createOscillator();o.type=type;o.frequency.value=mtof(m);const f=AC.createBiquadFilter();f.type='lowpass';f.frequency.value=cut;const g=AC.createGain();g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(peak,t+.03);g.gain.setValueAtTime(peak*.8,t+Math.max(.04,dur-.06));g.gain.exponentialRampToValueAtTime(.0001,t+dur+.08);o.connect(f).connect(g).connect(dest);o.start(t);o.stop(t+dur+.12)}
+/* Beethoven (phạm vi công cộng), chép lại thành nốt và phối bằng máy:
+   s5 = Giao hưởng số 5 cung Đô thứ, chương 1, mô-típ "số phận"
+   moon = Sonata Ánh trăng, chương 3 (Presto agitato), chuỗi rải hợp âm Đô thăng thứ */
+function buildS5(){const ev=[];let s=0;
+  const mot=(n,l,hold,bass)=>{[2,4,6].forEach(k=>ev.push([s+k,'m',n,1.6]));ev.push([s+8,'m',l,hold*.9],[s+8,'b',bass,hold*.9],[s+8,'k']);s+=8+hold};
+  mot(67,63,16,36);mot(65,62,24,31);
+  mot(67,63,8,36);mot(68,67,8,31);mot(75,72,8,36);mot(80,79,8,31);
+  mot(77,75,8,39);mot(75,74,8,31);mot(74,72,8,32);mot(72,71,8,31);
+  mot(67,63,16,36);mot(65,62,16,31);mot(79,75,8,36);mot(77,74,16,31);
+  return{len:s,ev}}
+function buildMoon(){const ev=[];const bars=[
+  {up:[49,56,61,64,68,73,76,80,85,88,92,97].map(n=>n-12),st:[61,64,68],b:25},
+  {up:[49,56,61,64,68,73,76,80,85,88,92,97].map(n=>n-12),st:[61,64,68],b:25},
+  {up:[48,51,54,56,60,63,66,68,72,75,78,80].map(n=>n-12),st:[60,63,66],b:32},
+  {up:[49,56,61,64,68,73,76,80,85,88,92,97].map(n=>n-12),st:[61,64,68],b:25}];
+  bars.forEach((B,i)=>{const o=i*16;B.up.forEach((n,k)=>ev.push([o+k,'p',n,.9]));[12,14].forEach(k=>{B.st.forEach(n=>ev.push([o+k,'c',n,1.5]));ev.push([o+k,'b',B.b,1.5],[o+k,'k'])})});
+  return{len:64,ev}}
+const SONGS={s5:buildS5(),moon:buildMoon()};
+for(const k in SONGS){const S_=SONGS[k];S_.at=Array.from({length:S_.len},()=>[]);S_.ev.forEach(e=>S_.at[e[0]%S_.len].push(e))}
+MUS.song='s5';
+function playStep(s,t,sp){const d=MUS.g,song=SONGS[MUS.song];
+  for(const e of song.at[s]){const [,k,n,l]=e;
+    if(k==='m'){voice('sawtooth',n,t,l*sp,.09,1800,d);voice('sawtooth',n-12,t,l*sp,.07,1200,d)}
+    else if(k==='b')voice('sawtooth',n,t,l*sp,.12,500,d);
+    else if(k==='p')note('triangle',n,t,.25,.11,d);
+    else if(k==='c')voice('square',n,t,l*sp,.05,1600,d);
+    else if(k==='k')drum(t,d,true)}
+  if(MUS.song==='s5'&&s%4===2)drum(t,d,false)}
+function musicTick(){if(!AC)return;
+  const want=MUS.danger?'moon':'s5',sp=MUS.song==='moon'?60/(138+((G&&G.wave)||0)*3)/4:60/(104+((G&&G.wave)||0)*5)/4;
   if(MUS.next<AC.currentTime)MUS.next=AC.currentTime+.05;
-  while(MUS.next<AC.currentTime+.15){playStep(MUS.step,MUS.next);MUS.next+=sp;MUS.step=(MUS.step+1)%32}}
+  while(MUS.next<AC.currentTime+.15){
+    if(want!==MUS.song&&MUS.step%16===0){MUS.song=want;MUS.step=0}
+    playStep(MUS.step,MUS.next,sp);MUS.next+=sp;MUS.step=(MUS.step+1)%SONGS[MUS.song].len}}
 function musicStart(){if(!AC||MUS.timer)return;MUS.g=AC.createGain();MUS.g.gain.value=MUS.on?.45:0;MUS.g.connect(master);MUS.next=AC.currentTime+.1;MUS.timer=setInterval(musicTick,25)}
 function musicSet(on){MUS.on=on;try{localStorage.setItem('thachma-music',on?'1':'0')}catch(e){}if(MUS.g)MUS.g.gain.setTargetAtTime(on?.45:0,AC.currentTime,.1);$('music').textContent=on?'Nhạc: bật':'Nhạc: tắt'}
 const vib=p=>{try{navigator.vibrate&&navigator.vibrate(p)}catch(e){}};
@@ -362,10 +386,10 @@ function shoot(){
   for(const m of G.mons){const b=m.box;if(b&&cx>b.x0&&cx<b.x1&&cy>b.y0&&cy<b.y1&&(!best||m.d<best.d))best=m}
   if(best){
     const b=best.box,head=cy<b.y0+(b.y1-b.y0)*.4,dmg=head?2:1,pan=Math.sin(wrap(best.a-S.yaw));
-    best.hit=.12;sfx.splat(pan);goo(cx,cy,best.type,8);
+    best.hit=.12;G.hitMark=.25;sfx.splat(pan);goo(cx,cy,best.type,8);
     if(head)G.pops.push({x:cx,y:cy-30,t:0,s:'Trúng đầu!'});
     if(NET.role==='guest'){try{NET.host.send({t:'hit',id:best.id,dmg,head})}catch(e){}}
-    else if(applyHit(best,dmg,head,null))goo(cx,cy,best.type,22);
+    else if(applyHit(best,dmg,head,null)){goo(cx,cy,best.type,22);G.killMark=.25}
   }
   if(G.mag===0&&G.res>0)hint('Hết đạn! Bấm NẠP');
   hud();
@@ -406,7 +430,7 @@ function drawWorld(){
     for(let d=4;d<=24;d+=4){const pts=[];for(let a=-80;a<=80;a+=5)pts.push(proj(a*D2R,d,0));polyline(pts)}
     for(let a=-75;a<=75;a+=15){const pts=[];for(let d=2;d<=30;d+=2)pts.push(proj(a*D2R,d,0));polyline(pts)}
   }
-  ctx.lineWidth=2;ctx.setLineDash([8,8]);ctx.strokeStyle='#ff3d7f88';
+  ctx.lineWidth=2;ctx.setLineDash([4,10]);ctx.strokeStyle='#ff3d7f55';
   const fence=[];for(let a=-62;a<=62;a+=4)fence.push(proj(a*D2R,2.4,0));polyline(fence);
   ctx.strokeStyle='#ff3d7f44';[-62,62].forEach(a=>{const pts=[];for(let d=2.4;d<=26;d+=2)pts.push(proj(a*D2R,d,0));polyline(pts)});
   ctx.setLineDash([]);
@@ -423,6 +447,40 @@ function drawMonsters(t){
     m.box={x0:p.x-m.T.w*.5*s,x1:p.x+m.T.w*.5*s,y0:p.y-m.T.h*s,y1:p.y};
   }
 }
+const NAMES={jelly:'Thạch Ma',sock:'Tất Nhảy',box:'Hộp Quà Cắn'};
+function target(){let best=null;const cx=W/2,cy=H/2;for(const m of G.mons){const b=m.box;if(b&&cx>b.x0&&cx<b.x1&&cy>b.y0&&cy<b.y1&&(!best||m.d<best.d))best=m}return best}
+function drawReticle(dt){
+  const tg=target(),lockT=tg?1:0;G.lock=(G.lock||0)+(lockT-(G.lock||0))*Math.min(1,dt*14);
+  const L=G.lock,cx=W/2,cy=H/2+G.recoil*12,col=L>.5?'#ff3d7f':'#9cff3c',r=34-L*8+G.recoil*10;
+  ctx.save();ctx.lineCap='round';ctx.shadowColor='rgba(0,0,0,.85)';ctx.shadowBlur=6;
+  // bóng mờ trong ống ngắm
+  ctx.fillStyle=L>.5?'rgba(255,61,127,.10)':'rgba(156,255,60,.06)';ctx.beginPath();ctx.arc(cx,cy,r+6,0,7);ctx.fill();
+  // vòng ngoài 4 cung xoay
+  const rot=G.t*(0.6+L*3);ctx.strokeStyle=col;ctx.lineWidth=3.5;
+  for(let i=0;i<4;i++){const a0=rot+i*Math.PI/2+.22,a1=a0+Math.PI/2-.44;ctx.beginPath();ctx.arc(cx,cy,r,a0,a1);ctx.stroke()}
+  // mũi tên chỉ vào tâm
+  ctx.fillStyle=col;for(let i=0;i<4;i++){const a=i*Math.PI/2,o=r+14+(1-L)*4,x=cx+Math.cos(a)*o,y=cy+Math.sin(a)*o;
+    ctx.save();ctx.translate(x,y);ctx.rotate(a);ctx.beginPath();ctx.moveTo(-7,0);ctx.lineTo(3,-6);ctx.lineTo(3,6);ctx.closePath();ctx.fill();ctx.restore()}
+  // vòng trong mảnh + vạch chia
+  ctx.lineWidth=1.5;ctx.globalAlpha=.85;ctx.beginPath();ctx.arc(cx,cy,12,0,7);ctx.stroke();
+  ctx.beginPath();for(let i=0;i<12;i++){const a=i*Math.PI/6,r1=r-6,r2=r-(i%3?2:10);ctx.moveTo(cx+Math.cos(a)*r1,cy+Math.sin(a)*r1);ctx.lineTo(cx+Math.cos(a)*r2,cy+Math.sin(a)*r2)}ctx.stroke();ctx.globalAlpha=1;
+  ctx.beginPath();ctx.arc(cx,cy,3,0,7);ctx.fill();
+  // khoá mục tiêu: ngoặc góc + tên + máu + khoảng cách
+  if(tg&&tg.box){const b=tg.box,pad=8+(1-L)*14+Math.sin(G.t*10)*2,x0=b.x0-pad,x1=b.x1+pad,y0=b.y0-pad,y1=b.y1+pad,k=Math.min(18,(x1-x0)/3);
+    ctx.strokeStyle='#ff3d7f';ctx.lineWidth=3;ctx.beginPath();
+    [[x0,y0,1,1],[x1,y0,-1,1],[x0,y1,1,-1],[x1,y1,-1,-1]].forEach(([x,y,sx,sy])=>{ctx.moveTo(x,y+sy*k);ctx.lineTo(x,y);ctx.lineTo(x+sx*k,y)});ctx.stroke();
+    const lbl=NAMES[tg.type]+' · '+Math.max(1,Math.round(tg.d))+'m';ctx.font='800 14px "Baloo 2",sans-serif';ctx.textAlign='center';
+    const tw=ctx.measureText(lbl).width+16,lx=(x0+x1)/2,ly=Math.max(30,y0-12);
+    ctx.shadowBlur=0;ctx.fillStyle='rgba(20,6,31,.8)';ctx.beginPath();ctx.roundRect?ctx.roundRect(lx-tw/2,ly-30,tw,22,11):ctx.rect(lx-tw/2,ly-30,tw,22);ctx.fill();
+    ctx.fillStyle='#fff7e6';ctx.fillText(lbl,lx,ly-14);
+    const n=tg.T.hp,w=Math.min(60,n*10),pw=w/n;for(let i=0;i<n;i++){ctx.fillStyle=i<tg.hp?'#ff3d7f':'#ffffff33';ctx.fillRect(lx-w/2+i*pw+1,ly-5,pw-2,5)}}
+  // dấu trúng đích
+  if(G.hitMark>0){const k=G.killMark>0,s2=(k?16:10)+(1-G.hitMark/.25)*6;ctx.strokeStyle=k?'#ff3d7f':'#fff';ctx.lineWidth=k?4:3;ctx.shadowBlur=6;ctx.beginPath();
+    [[1,1],[1,-1],[-1,1],[-1,-1]].forEach(([a,b2])=>{ctx.moveTo(W/2+a*s2*.45,H/2+b2*s2*.45);ctx.lineTo(W/2+a*s2,H/2+b2*s2)});ctx.stroke();G.hitMark-=dt;G.killMark-=dt}
+  // vòng nạp đạn
+  if(G.reload>0){ctx.strokeStyle='#ffcf3a';ctx.lineWidth=5;ctx.beginPath();ctx.arc(cx,cy,r+26,-Math.PI/2,-Math.PI/2+(1-G.reload/1.3)*Math.PI*2);ctx.stroke()}
+  ctx.restore();
+}
 function drawOverlay(dt){
   const v=ctx.createRadialGradient(W/2,H/2,Math.min(W,H)*.35,W/2,H/2,Math.max(W,H)*.75);
   v.addColorStop(0,'#0000');v.addColorStop(1,S.cam?'#14061fcc':'#000a');ctx.fillStyle=v;ctx.fillRect(0,0,W,H);
@@ -436,13 +494,8 @@ function drawOverlay(dt){
   G.parts=G.parts.filter(p=>p.t<.7);for(const p of G.parts){ctx.globalAlpha=1-p.t/.7;ctx.fillStyle=p.c;ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,7);ctx.fill()}ctx.globalAlpha=1;
   for(const p of G.pops){p.t+=dt;p.y-=40*dt}G.pops=G.pops.filter(p=>p.t<1);
   ctx.font='800 22px "Baloo 2",sans-serif';ctx.textAlign='center';for(const p of G.pops){ctx.globalAlpha=1-p.t;ctx.fillStyle='#000';ctx.fillText(p.s,p.x+2,p.y+2);ctx.fillStyle=p.c||'#9cff3c';ctx.fillText(p.s,p.x,p.y)}ctx.globalAlpha=1;
-  const cx=W/2,cy=H/2+G.recoil*10,r=20+G.recoil*8;let onT=false;
-  for(const m of G.mons){const b=m.box;if(b&&cx>b.x0&&cx<b.x1&&H/2>b.y0&&H/2<b.y1)onT=true}
-  ctx.strokeStyle=onT?'#ff3d7f':'#9cff3c';ctx.lineWidth=3;ctx.beginPath();ctx.arc(cx,cy,r,0,7);ctx.stroke();
-  ctx.beginPath();[[1,0],[-1,0],[0,1],[0,-1]].forEach(([a,b])=>{ctx.moveTo(cx+a*(r-8),cy+b*(r-8));ctx.lineTo(cx+a*(r+10),cy+b*(r+10))});ctx.stroke();
-  ctx.fillStyle=ctx.strokeStyle;ctx.beginPath();ctx.arc(cx,cy,2.5,0,7);ctx.fill();
+  drawReticle(dt);
   if(G.flash>0){ctx.fillStyle='rgba(255,240,200,'+G.flash*5+')';ctx.fillRect(0,0,W,H)}
-  if(G.reload>0){ctx.strokeStyle='#ffcf3a';ctx.lineWidth=5;ctx.beginPath();ctx.arc(cx,cy,r+18,-Math.PI/2,-Math.PI/2+(1-G.reload/1.3)*Math.PI*2);ctx.stroke()}
 }
 
 /* ---------- vòng lặp ---------- */
@@ -467,7 +520,7 @@ function step(dt){
   if(NET.role==='host'&&(NET.sendT-=dt)<=0){NET.sendT=.1;bcast(snap())}
   if(G.breakT>0){if((G.breakT-=dt)<=0)startWave(G.wave+1);return}
   if(G.queue.length&&(G.spawnT-=dt)<=0){spawn(G.queue.pop());G.spawnT=Math.max(.7,2.6-G.wave*.35)*rnd(.6,1.3)}
-  let nearest=99;MUS.danger=G.mons.some(m=>m.d<8);
+  let nearest=99;MUS.danger=G.mons.some(m=>m.d<7);
   for(const m of G.mons.slice()){
     m.d-=m.spd*dt;m.hit=Math.max(0,m.hit-dt);
     if(m.type==='sock')m.a=clamp(m.a+Math.sin(G.t*2.5+m.ph)*.35*dt,-ARC,ARC);
