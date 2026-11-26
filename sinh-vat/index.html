@@ -1547,8 +1547,24 @@ function onNet(d,role){if(!d||typeof d!=='object')return;
 
 /* ================= tự đấu: hai sinh vật tự chiến đấu trên sàn đấu giữa phòng ================= */
 const AREN={R:1.1,D:1.9};
+/* ---- sàn đấu theo hệ: đọc màu khung cảnh sau camera ---- */
+const TERR={hoa:{n:'Núi lửa',i:'🌋',p:['🔥','✨','🔸'],why:'đỏ cam'},thuy:{n:'Hồ nước',i:'🌊',p:['🫧','💧'],why:'xanh dương'},moc:{n:'Rừng xanh',i:'🌳',p:['🍃','🌿','🍂'],why:'xanh lá'},
+  kim:{n:'Mỏ kim loại',i:'⛏️',p:['✨','⚙️','🔩'],why:'xám bạc, trắng'},tho:{n:'Núi đá',i:'⛰️',p:['🪨','🟤'],why:'nâu, vàng đất'}};
+const terrC=document.createElement('canvas');terrC.width=32;terrC.height=24;const terrX=terrC.getContext('2d',{willReadFrequently:true});
+function camTerrain(){if(!(stream&&stream.active&&vid.videoWidth))return null;let q;try{terrX.drawImage(vid,0,0,32,24);q=terrX.getImageData(0,0,32,24).data}catch(e){return null}
+  const sc={hoa:0,thuy:0,moc:0,kim:0,tho:0};let n=0;
+  for(let i=0;i<q.length;i+=4){const r=q[i]/255,g=q[i+1]/255,b=q[i+2]/255,mx=Math.max(r,g,b),mn=Math.min(r,g,b),sat=mx?(mx-mn)/mx:0;n++;
+    if(mx<.12)continue;// quá tối thì bỏ qua
+    if(sat<.16){if(mx>.45)sc.kim+=.55+mx*.4;else sc.tho+=.25;continue}
+    let h;if(mx===r)h=((g-b)/(mx-mn)+6)%6;else if(mx===g)h=(b-r)/(mx-mn)+2;else h=(r-g)/(mx-mn)+4;h*=60;const w=.6+sat;
+    if(h<18||h>=330)sc.hoa+=w*1.3;else if(h<48){if(sat>.7&&mx>.75)sc.hoa+=w;else sc.tho+=w*1.2}else if(h<70)sc.tho+=w*.8;else if(h<165)sc.moc+=w*1.3;else if(h<265)sc.thuy+=w*1.3;else sc.hoa+=w*.6}
+  let best='tho',bv=-1,tot=0;for(const k in sc){tot+=sc[k];if(sc[k]>bv){bv=sc[k];best=k}}return tot>3?{k:best,pct:Math.round(bv/tot*100)}:null}
+function terrMult(c,B){const t=B&&B.terrain;if(!t)return 1;const P=elParts(c.el);if(P.includes(t))return 1.15;if(P.some(p=>KHAC[t]===p))return .9;return 1}
+function pickTerrain(B){const r=camTerrain();if(r){B.terrain=r.k;B.terrWhy='Camera thấy nhiều màu '+TERR[r.k].why+' ('+r.pct+'%)'}else{const ks=Object.keys(TERR);B.terrain=ks[(Math.random()*ks.length)|0];B.terrWhy='Không có camera nên bốc ngẫu nhiên'}
+  autoEv(B,{t:'terr',k:B.terrain,why:B.terrWhy})}
+
 const TRAITS_BRAVE=/dũng cảm|hiếu động|cáu kỉnh|tinh nghịch|lăng xăng/,TRAITS_SHY=/nhút nhát|lười|mơ mộng|ngái ngủ/;
-function autoInit(B){const yaw=S.yaw;B.y0=yaw;B.R=AREN.R;B.dmgM=1;B.shrunk=0;B.banner=null;B.cx=AREN.D*Math.sin(yaw);B.cz=AREN.D*Math.cos(yaw);B.proj=[];B.zones=[];B.vfx=[];B.tm=0;B.snapT=0;B.fxq=[];B.spd=B.spd||1;
+function autoInit(B){const yaw=S.yaw;B.y0=yaw;B.terrain=null;B.amb=[];B.R=AREN.R;B.dmgM=1;B.shrunk=0;B.banner=null;B.cx=AREN.D*Math.sin(yaw);B.cz=AREN.D*Math.cos(yaw);B.proj=[];B.zones=[];B.vfx=[];B.tm=0;B.snapT=0;B.fxq=[];B.spd=B.spd||1;
   B.f.forEach((f,i)=>{const s=f.c.stats,tr=(f.c.traits||[]).join(' ');f.max=f.max*5;f.hp=f.max;f.u=i?.7:-.7;f.v=0;f.fu=i?-1:1;f.fv=0;f.mov=0;f.cd={atk:.6+Math.random()*.5,mag:1.2+Math.random(),cute:4,def:1.5};
     f.en=30+Math.random()*10;f.sp=0;f.think=.3;f.str=i?1:-1;f.lunge=0;f.cast=0;f.guardT=0;f.sleep=0;f.reflT=0;f.reflK=0;f.wallT=0;f.dodgeT=0;f.slowT=0;f.leechT=0;f.leechD=0;f.leechF=0;f.regenT=0;f.regenD=0;f.trapIc='';f.combo=0;f.spTk=null;f.stunT=0;f.softT=0;f.burnT=0;f.chillT=0;f.regT=0;f.hurt=0;f.y=0;f.vy=0;f.dir=i?-1:1;f.flip=(i?-1:1)*(f.c.face||1);f.tilt=0;
     f.melee=s.sucManh>=s.phepThuat;f.brave=TRAITS_BRAVE.test(tr)?1:TRAITS_SHY.test(tr)?-1:0;f.spdM=(.32+s.tocDo*.045)*(elTrait(f.c)==='nhanh'?1.3:1)*({f:1.15,h:1.05,t:.85}[f.c.mv]||1)});
@@ -1561,9 +1577,9 @@ function autoHit(B,a,d,kind,base,o){o=o||{};const ta=elTrait(a.c),td=elTrait(d.c
   const ev={t:'hit',a:ai,k:kind,dmg:0,heal:0,adv:elMult(a.c.el,d.c.el)};if(o.ic)ev.ic=o.ic;
   let dodge=kind==='atk'?.05+(d.c.stats.tocDo-5)*.02:kind==='mag'?.06:0;if(kind!=='sp'){if(td==='ne')dodge+=.15;if(td==='mu')dodge+=.1;if(ta==='nhanh')dodge-=.05;if(d.dodgeT>0)dodge+=.65}
   if(d.stunT>0)dodge=0;if(r()<dodge){ev.miss=1;autoEv(B,ev);return}
-  let dm=base*ev.adv*(B.dmgM||1);if((kind==='atk'&&r()<.1)||(o.crit&&r()<o.crit)){dm*=1.5;ev.crit=1}if(d.guardT>0&&!o.pierce)dm*=kind==='mag'?.7:.5;if(a.chillT>0)dm*=.7;if(td==='giap')dm*=.8;if(d.wallT>0&&!o.pierce)dm*=.5;
+  let dm=base*ev.adv*(B.dmgM||1)*terrMult(a.c,B);if((kind==='atk'&&r()<.1)||(o.crit&&r()<o.crit)){dm*=1.5;ev.crit=1}if(d.guardT>0&&!o.pierce)dm*=kind==='mag'?.7:.5;if(a.chillT>0)dm*=.7;if(td==='giap')dm*=.8;if(d.wallT>0&&!o.pierce)dm*=.5;
   dm=Math.max(1,Math.round(dm));if(d.shield&&!o.pierce){d.shield=false;dm=0;ev.shielded=1}
-  ev.dmg=dm;d.hp=Math.max(0,d.hp-dm);d.hurt=.35;if(dm){a.en=Math.min(100,(a.en||0)+dm/a.max*100);d.en=Math.min(100,(d.en||0)+dm/d.max*150)}if(dm&&d.sleep){d.sleep=0;d.stunT=0;ev.wake=1}
+  ev.dmg=dm;d.hp=Math.max(0,d.hp-dm);d.hurt=.35;if(dm){a.en=Math.min(100,(a.en||0)+dm/a.max*100*(terrMult(a.c,B)>1?1.25:1));d.en=Math.min(100,(d.en||0)+dm/d.max*150)}if(dm&&d.sleep){d.sleep=0;d.stunT=0;ev.wake=1}
   if(dm&&d.reflT>0){const rf=Math.max(1,Math.round(dm*d.reflK));a.hp=Math.max(1,a.hp-rf);ev.mirror=rf}
   if(dm&&o.r){if(o.r==='bong'){d.burnT=3.6;ev.tr='bong'}else if(o.r==='choang'){d.stunT=Math.max(d.stunT,1.6);ev.tr='set'}else if(o.r==='dongbang'){d.stunT=Math.max(d.stunT,1.8);d.chillT=3.5;ev.tr='bang'}
     else if(o.r==='hut'){const h=Math.max(1,Math.round(dm*.5));a.hp=Math.min(a.max,a.hp+h);ev.heal=h;ev.tr='hut'}else if(o.r==='day'){const du=d.u-a.u,dv=d.v-a.v,l=Math.hypot(du,dv)||1;d.u+=du/l*.5;d.v+=dv/l*.5;ev.tr='day'}}
@@ -1611,7 +1627,7 @@ function tkWant(f,o,tk,d,r,B){const a=tk.a;
   if(a==='aoe')return d<Math.min(tk.rad,2.4)*.9&&r<.3;
   if(a==='trap'||a==='sleep'||a==='slow'||a==='beam')return d<2.2&&r<.22;
   return d<2.4&&r<.2}
-function stepAuto(B,dt){if(B.over)return;B.tm+=dt;
+function stepAuto(B,dt){if(B.over)return;B.tm+=dt;if(!B.terrain&&B.tm>=.8)pickTerrain(B);
   // quá 45 giây: sàn thu hẹp dần, đòn đánh mạnh lên để trận không kéo dài
   if(B.tm>45){B.R=Math.max(AREN.R*.5,AREN.R*(1-(B.tm-45)/45));B.dmgM=1+(B.tm-45)/30;if(!B.shrunk){B.shrunk=1;autoEv(B,{t:'shrink'})}}
   for(let i=0;i<2;i++){const f=B.f[i],o=B.f[1-i],s=f.c.stats;
@@ -1670,6 +1686,9 @@ function playAutoFx(e){const B=BT;if(!B)return;const nm=i=>B.f[i].c.name;
     if(e.tr==='bong')m+=' 🌋 Bị bỏng!';if(e.tr==='cham')m+=' ❄️ Lạnh cóng!';if(e.tr==='set')m+=' ⚡ Bị điện giật choáng!';if(e.tr==='hut')m+=' 🍃 Hút '+e.heal+' máu!';if(e.tr==='bang')m+=' ❄️ Đóng băng!';if(e.tr==='day')m+=' Bị đẩy văng!';if(e.wake)m+=' '+nm(op)+' tỉnh giấc!';if(e.mirror)m+=' 🪞 Phản lại '+e.mirror+' máu!';if(e.refl)m+=' 💎 Phản '+e.refl+' máu!';autoLog(m)}
   else if(e.t==='cute'){B.fxp.push({i:e.i,ch:'+'+e.h,col:'#7ee0c3'});B.bub[e.i]={text:pick(SHOUT.cute),t:1.4};SND.happy(B.f[e.i].c);autoLog(nm(e.i)+' làm nũng, hồi '+e.h+' máu'+(e.soft?'. '+nm(1-e.i)+' mềm lòng không nỡ đánh!':'.'))}
   else if(e.t==='vfx'){B.vfx=B.vfx||[];B.vfx.push(Object.assign({life:e.k==='beam'?.55:.7,age:0},e));if(e.k==='boom'){blip(160,50,.25,'square',.09)}if(e.k==='ring')blip(120,40,.35,'sawtooth',.08)}
+  else if(e.t==='terr'){const x=TERR[e.k],el=EL[e.k],m=[0,1].map(i=>terrMult(B.f[i].c,B));B.banner={ic:x.i,text:'Sàn '+x.n,col:el.c,t:0,life:2.6};blip(330,660,.3,'sine',.08);
+    let t=x.i+' '+e.why+' → sàn '+x.n+' ('+el.i+' '+el.n+').';const up=[0,1].filter(i=>m[i]>1).map(i=>nm(i)),dn=[0,1].filter(i=>m[i]<1).map(i=>nm(i));
+    if(up.length)t+=' '+up.join(' và ')+' hợp sàn, mạnh hơn 15%!';if(dn.length)t+=' '+dn.join(' và ')+' bị sàn khắc, yếu đi 10%.';if(!up.length&&!dn.length)t+=' Không ai hợp sàn này.';autoLog(t)}
   else if(e.t==='shrink'){B.banner={ic:'⚠️',text:'Sàn đấu thu hẹp!',col:'#ff6b6b',t:0,life:2.2};blip(220,110,.4,'sawtooth',.08);autoLog('⚠️ Trận kéo dài: sàn đấu thu hẹp dần, đòn đánh mạnh lên!')}
   else if(e.t==='immune'){B.fxp.push({i:e.i,ch:'Bay nên không sao!',col:'#9fd8ff'});autoLog(nm(e.i)+' đang bay trên không, động đất không làm gì được!')}
   else if(e.t==='block'){B.fxp.push({i:e.i,ch:'🧱 Chặn!',col:'#d6a86a'});autoLog('Tường đá của '+nm(e.i)+' chặn đứng phép bay!')}
@@ -1687,6 +1706,10 @@ function drawAuto(T,dt){const B=BT;ux.clearRect(0,0,W,H);ox.clearRect(0,0,W,H);g
   const RR=B.R||AREN.R,r1=ring(RR+.12),r2=ring(RR);
   if(r1&&r2){const c0=(elInfo(B.f[0].c.el)||elInfo('tho')).c,c1=(elInfo(B.f[1].c.el)||elInfo('tho')).c;
     ux.save();ux.beginPath();r1.forEach((p,i)=>i?ux.lineTo(p.x,p.y):ux.moveTo(p.x,p.y));ux.closePath();ux.fillStyle='rgba(20,16,28,.35)';ux.fill();
+    if(B.terrain){const tc=EL[B.terrain].c,cp0=proj(B.cx,0,B.cz);if(cp0){const rx=Math.abs(r1[0].x-r1[24].x)/2||100,g=ux.createRadialGradient(cp0.x,cp0.y,0,cp0.x,cp0.y,rx);g.addColorStop(0,tc+'55');g.addColorStop(.7,tc+'22');g.addColorStop(1,tc+'00');ux.fillStyle=g;ux.fill();
+      const tx=TERR[B.terrain];B.amb=B.amb||[];if(B.amb.length<14&&Math.random()<dt*6){const an=Math.random()*6.283,rr0=Math.sqrt(Math.random())*(B.R||AREN.R);B.amb.push({u:Math.cos(an)*rr0,v:Math.sin(an)*rr0,h:0,vh:rnd(.15,.4),life:rnd(1.5,3),t:0,ch:pick(tx.p),sw:Math.random()*6})}
+      ox.save();ox.textAlign='center';ox.textBaseline='middle';for(const a of B.amb){a.t+=dt;a.h+=a.vh*dt;const w=aw(B,a.u+Math.sin(a.t*2+a.sw)*.05,a.v),q=proj(w.x,a.h,w.z);if(!q)continue;ox.globalAlpha=Math.max(0,Math.min(1,a.t*2,(a.life-a.t)*1.5))*.8;ox.font=Math.max(10,q.s*.08)+'px serif';ox.fillText(a.ch,q.x,q.y)}ox.restore();B.amb=B.amb.filter(a=>a.t<a.life);
+      const ft=r1[36];if(ft){ox.save();ox.font='700 13px system-ui';ox.textAlign='center';ox.fillStyle='#fff';ox.shadowColor='#000';ox.shadowBlur=5;ox.fillText(tx.i+' '+tx.n,ft.x,ft.y+16);ox.restore()}}}
     const g=ux.createLinearGradient(r1[24].x,0,r1[0].x,0);g.addColorStop(0,c0);g.addColorStop(1,c1);ux.lineWidth=4;ux.strokeStyle=g;ux.globalAlpha=.9;ux.stroke();
     ux.beginPath();r2.forEach((p,i)=>i?ux.lineTo(p.x,p.y):ux.moveTo(p.x,p.y));ux.closePath();ux.globalAlpha=.5;ux.lineWidth=1.5;ux.strokeStyle='#fff';ux.setLineDash([6,8]);ux.stroke();ux.restore()}
   const cp=proj(B.cx,0,B.cz);B.lost=!cp||cp.x<-40||cp.x>W+40||cp.y<-40||cp.y>H+40;
@@ -1755,9 +1778,9 @@ function drawAuto(T,dt){const B=BT;ux.clearRect(0,0,W,H);ox.clearRect(0,0,W,H);g
     const g=ox.createLinearGradient(-tw/2,0,tw/2,0);g.addColorStop(0,'rgba(20,16,30,.0)');g.addColorStop(.15,'rgba(20,16,30,.85)');g.addColorStop(.85,'rgba(20,16,30,.85)');g.addColorStop(1,'rgba(20,16,30,0)');ox.fillStyle=g;ox.fillRect(-tw/2,-24,tw,48);
     ox.fillStyle=b.col;ox.fillRect(-tw/2*.8,-24,tw*.8,3);ox.fillRect(-tw/2*.8,21,tw*.8,3);ox.shadowColor=b.col;ox.shadowBlur=16;ox.fillStyle='#fff';ox.textAlign='center';ox.textBaseline='middle';ox.fillText(txt,0,1);ox.restore()}}
   if(B.lost){ox.save();ox.font='600 15px system-ui';ox.textAlign='center';ox.fillStyle='#fff';ox.shadowColor='#000';ox.shadowBlur=6;ox.fillText('Sàn đấu ở phía trước. Nghiêng máy nhìn xuống, hoặc bấm 🎯',W/2,H*.45);ox.restore()}}
-function autoSnap(B){return{t:'snap',f:B.f.map(f=>({u:+f.u.toFixed(3),v:+f.v.toFixed(3),hp:f.hp,mov:+f.mov.toFixed(2),lunge:+f.lunge.toFixed(2),cast:+f.cast.toFixed(2),guardT:+f.guardT.toFixed(2),stunT:+f.stunT.toFixed(2),burnT:+f.burnT.toFixed(2),chillT:+f.chillT.toFixed(2),softT:+f.softT.toFixed(2),shield:f.shield,sp:f.sp,en:Math.round(f.en||0),sleep:f.sleep,trapIc:f.trapIc,reflT:+f.reflT.toFixed(2),wallT:+f.wallT.toFixed(2),dodgeT:+f.dodgeT.toFixed(2),slowT:+f.slowT.toFixed(2),leechT:+f.leechT.toFixed(2),regenT:+f.regenT.toFixed(2)})),R:+(B.R||AREN.R).toFixed(3),z:B.zones.map(z=>({k:z.k,u:+z.u.toFixed(3),v:+z.v.toFixed(3),r:z.r,t:+z.t.toFixed(2),ic:z.ic,from:z.from})),
+function autoSnap(B){return{t:'snap',f:B.f.map(f=>({u:+f.u.toFixed(3),v:+f.v.toFixed(3),hp:f.hp,mov:+f.mov.toFixed(2),lunge:+f.lunge.toFixed(2),cast:+f.cast.toFixed(2),guardT:+f.guardT.toFixed(2),stunT:+f.stunT.toFixed(2),burnT:+f.burnT.toFixed(2),chillT:+f.chillT.toFixed(2),softT:+f.softT.toFixed(2),shield:f.shield,sp:f.sp,en:Math.round(f.en||0),sleep:f.sleep,trapIc:f.trapIc,reflT:+f.reflT.toFixed(2),wallT:+f.wallT.toFixed(2),dodgeT:+f.dodgeT.toFixed(2),slowT:+f.slowT.toFixed(2),leechT:+f.leechT.toFixed(2),regenT:+f.regenT.toFixed(2)})),tr:B.terrain,R:+(B.R||AREN.R).toFixed(3),z:B.zones.map(z=>({k:z.k,u:+z.u.toFixed(3),v:+z.v.toFixed(3),r:z.r,t:+z.t.toFixed(2),ic:z.ic,from:z.from})),
   p:B.proj.map(p=>({u:+p.u.toFixed(3),v:+p.v.toFixed(3),du:p.du,dv:p.dv,ic:p.ic})),fx:B.fxq.splice(0)}}
-function autoApply(B,d){d.f.forEach((s,i)=>Object.assign(B.f[i],s));B.proj=d.p;B.zones=d.z||[];if(d.R)B.R=d.R;B.vfx=B.vfx||[];for(const e of d.fx||[]){if(e.t==='win'){if(B.win==null)endBattle(e.w)}else playAutoFx(e)}}
+function autoApply(B,d){d.f.forEach((s,i)=>Object.assign(B.f[i],s));B.proj=d.p;B.zones=d.z||[];if(d.R)B.R=d.R;if(d.tr)B.terrain=d.tr;B.vfx=B.vfx||[];for(const e of d.fx||[]){if(e.t==='win'){if(B.win==null)endBattle(e.w)}else playAutoFx(e)}}
 $('bSpd').onclick=()=>{if(!BT)return;if(BT.mode==='net'){toast('Đấu qua mạng chạy cùng tốc độ cho cả hai máy');return}BT.spd=BT.spd>1?1:2;$('bSpd').textContent=BT.spd>1?'▶️ Tốc độ thường':'⏩ Nhanh ×2'};
 $('bLook').onclick=()=>{if(!BT||!BT.auto)return;const a=Math.atan2(BT.cx,BT.cz);if(S.gyro){S.yaw0=(S.yaw0||0)+wrap(S.yaw-a);}else{S.tYaw=a;S.tPitch=-.62}};
 /* --- trận đấu --- */
@@ -1775,7 +1798,7 @@ function myTurn(){if(!BT||BT.auto||BT.win!=null||BT.busy)return false;if(BT.mode
 function renderBattle(){
   for(let i=0;i<2;i++){const f=BT.f[i],e=$('hp'+i),pct=f.hp/f.max*100,xi=elInfo(f.c.el)||elInfo('tho');
     e.className='hpc'+(BT.turn===i&&BT.win==null?' turn':'');e.style.borderLeft='5px solid '+SIDECOL[i];
-    e.innerHTML='<b></b><small class="who2"></small><div class="hpbar"><i style="width:'+pct+'%" class="'+(pct<30?'low':'')+'"></i></div><small>'+f.hp+'/'+f.max+' · '+xi.i+' '+xi.n+(f.guard?' · 🛡️':'')+(f.shield?' · 🔰':'')+(f.soft?' · 💕':'')+(BT.auto?' · ⚡'+Math.round(f.en||0)+'%':f.sp?' · 🌟':'')+(f.burn?' · 🔥'+f.burn:'')+(f.chill?' · ❄️':'')+'</small>';
+    e.innerHTML='<b></b><small class="who2"></small><div class="hpbar"><i style="width:'+pct+'%" class="'+(pct<30?'low':'')+'"></i></div><small>'+f.hp+'/'+f.max+' · '+xi.i+' '+xi.n+(f.guard?' · 🛡️':'')+(f.shield?' · 🔰':'')+(f.soft?' · 💕':'')+(BT.auto?(BT.terrain&&terrMult(f.c,BT)!==1?(terrMult(f.c,BT)>1?' · '+TERR[BT.terrain].i+'↑':' · '+TERR[BT.terrain].i+'↓'):'')+' · ⚡'+Math.round(f.en||0)+'%':f.sp?' · 🌟':'')+(f.burn?' · 🔥'+f.burn:'')+(f.chill?' · ❄️':'')+'</small>';
     e.querySelector('b').textContent=f.c.name;e.querySelector('.who2').textContent=(f.who.emo||'')+' '+(f.who.name||'')}
   const can=myTurn(),tf=BT.f[BT.turn];document.querySelectorAll('#bPanel .mv').forEach(b=>b.disabled=!can);
   {const sf=BT.mode==='local'?tf:BT.f[BT.my],b=document.querySelector('#bPanel .mv.sp'),sp=sf.c.spc;b.firstChild.textContent=(sp.ic||'🌟')+' '+sp.ten;b.querySelector('small').textContent=sf.sp?(sp.mt||SPFX[sp.hu].d)+' · dùng 1 lần':'Đã dùng trong trận này';if(!sf.sp)b.disabled=true}
